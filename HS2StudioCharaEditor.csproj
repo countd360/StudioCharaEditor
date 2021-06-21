@@ -1,0 +1,102 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{27E21F22-F431-4D3C-8C17-AF89628F0694}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>StudioCharaEditor</RootNamespace>
+    <AssemblyName>HS2StudioCharaEditor</AssemblyName>
+    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="0Harmony">
+      <HintPath>..\..\..\..\..\ill\HoneySelect 2\BepInEx\core\0Harmony.dll</HintPath>
+    </Reference>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>..\..\..\..\..\ill\HoneySelect 2\StudioNEOV2_Data\Managed\Assembly-CSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="BepInEx">
+      <HintPath>..\..\..\..\..\ill\HoneySelect 2\BepInEx\core\BepInEx.dll</HintPath>
+    </Reference>
+    <Reference Include="HS2ABMX">
+      <HintPath>..\..\..\..\..\ill\HoneySelect 2\BepInEx\Plugins\HS2ABMX.dll</HintPath>
+    </Reference>
+    <Reference Include="HS2API">
+      <HintPath>..\..\..\..\..\ill\HoneySelect 2\BepInEx\Plugins\HS2API.dll</HintPath>
+    </Reference>
+    <Reference Include="HS2_BoobSettings">
+      <HintPath>..\..\..\..\..\ill\HoneySelect 2\BepInEx\Plugins\HS2_BoobSettings.dll</HintPath>
+    </Reference>
+    <Reference Include="IL">
+      <HintPath>..\..\..\..\..\ill\HoneySelect 2\StudioNEOV2_Data\Managed\IL.dll</HintPath>
+    </Reference>
+    <Reference Include="PushUpAI">
+      <HintPath>..\..\..\..\..\ill\HoneySelect 2\BepInEx\Plugins\PushUpAI.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Xml" />
+    <Reference Include="UniRx, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\..\..\ill\HoneySelect 2\StudioNEOV2_Data\Managed\UniRx.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>..\..\..\..\..\ill\HoneySelect 2\StudioNEOV2_Data\Managed\UnityEngine.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>..\..\..\..\..\ill\HoneySelect 2\StudioNEOV2_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.ImageConversionModule, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\..\..\ill\HoneySelect 2\StudioNEOV2_Data\Managed\UnityEngine.ImageConversionModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>..\..\..\..\..\ill\HoneySelect 2\StudioNEOV2_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\..\..\ill\HoneySelect 2\StudioNEOV2_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Core\CharaDetailInfo.cs" />
+    <Compile Include="Core\CharaEditorController.cs" />
+    <Compile Include="Core\CharaEditorMgr.cs" />
+    <Compile Include="Core\PluginABMX.cs" />
+    <Compile Include="Core\PluginBoobSetting.cs" />
+    <Compile Include="GUI\CharaEditorUI.cs" />
+    <Compile Include="StudioCharaEditor.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>copy $(TargetPath) "C:\ill\HoneySelect 2\BepInEx\Plugins\" /Y</PostBuildEvent>
+  </PropertyGroup>
+</Project>
