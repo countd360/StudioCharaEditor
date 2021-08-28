@@ -416,6 +416,9 @@ namespace StudioCharaEditor
                                     case CharaDetailDefine.CharaDetailDefineType.TOGGLE:
                                         guiRenderToggle(chaCtrl, dname, dInfo);
                                         break;
+                                    case CharaDetailDefine.CharaDetailDefineType.HAIR_BUNDLE:
+                                        guiRenderHairBundle(chaCtrl, curDetailSetKey, dInfo);
+                                        break;
                                     case CharaDetailDefine.CharaDetailDefineType.ABMXSET1:
                                     case CharaDetailDefine.CharaDetailDefineType.ABMXSET2:
                                     case CharaDetailDefine.CharaDetailDefineType.ABMXSET3:
@@ -642,7 +645,7 @@ namespace StudioCharaEditor
                 if (GUILayout.Button("+10", GUILayout.Width(35)))
                     newV += 0.1f;
             }
-            if (GUILayout.Button("R", GUILayout.Width(25)))
+            if (dInfo.RevertValue != null && GUILayout.Button("R", GUILayout.Width(25)))
                 newV = (float)dInfo.RevertValue;
             if (!unlimitMode)
             {
@@ -700,7 +703,7 @@ namespace StudioCharaEditor
             GUILayout.Space(4);
             GUILayout.Label(formatColor(oldC));
             GUILayout.FlexibleSpace();
-            if (GUILayout.Button("R", GUILayout.Width(25)))
+            if (dInfo.RevertValue != null && GUILayout.Button("R", GUILayout.Width(25)))
                 onChangeColor((Color)dInfo.RevertValue);
             GUILayout.EndHorizontal();
         }
@@ -716,6 +719,7 @@ namespace StudioCharaEditor
             float thumbListMinH = thumbSize * 2 + 20;// 130;
             float thumbListMaxH = fullh * 0.7f;// 350;
 
+            //Console.WriteLine("Render selector of {0}", dInfo.DetailDefine.Key);
             int oldId = (int)dInfo.DetailDefine.Get(chaCtrl);
             string oldName = "!!Unknown!!";
             int oldIndex = -1;
@@ -755,7 +759,7 @@ namespace StudioCharaEditor
                 if (expandPool[name])
                     scrollPool[name] = new Vector2(0, oldIndex * (thumbSize + 4) + 4);
             }
-            if (GUILayout.Button("R", GUILayout.Width(25)))
+            if (dInfo.RevertValue != null && GUILayout.Button("R", GUILayout.Width(25)))
                 onChangeId((int)dInfo.RevertValue);
             GUILayout.EndHorizontal();
             // expandable list
@@ -821,20 +825,98 @@ namespace StudioCharaEditor
 
         private void guiRenderToggle(ChaControl chaCtrl, string name, CharaDetailInfo dInfo)
         {
-            bool newV;
-            bool oldV = (bool)dInfo.DetailDefine.Get(chaCtrl);
+            bool newV, oldV;
+            object curV = dInfo.DetailDefine.Get(chaCtrl);
+            if (curV.GetType() == typeof(bool))
+            {
+                oldV = (bool)curV;
+            }
+            else
+            {
+                oldV = (float)curV == 1;
+            }
+
             GUILayout.BeginHorizontal();
             GUILayout.Label(" ", GUILayout.Width(namew));
             newV = GUILayout.Toggle(oldV, LC(name));
             GUILayout.FlexibleSpace();
-            if (GUILayout.Button("R", GUILayout.Width(25)))
-                newV = (bool)dInfo.RevertValue;
+            if (dInfo.RevertValue != null && GUILayout.Button("R", GUILayout.Width(25)))
+            {
+                if (dInfo.RevertValue.GetType() == typeof(bool))
+                {
+                    newV = (bool)dInfo.RevertValue;
+                }
+                else
+                {
+                    newV = (float)dInfo.RevertValue == 1;
+                }
+            }
             if (newV != oldV)
             {
                 dInfo.DetailDefine.Set(chaCtrl, newV);
                 if (dInfo.DetailDefine.Upd != null && !LaterUpdate) dInfo.DetailDefine.Upd(chaCtrl);
             }
             GUILayout.EndHorizontal();
+        }
+
+        private void guiRenderHairBundle(ChaControl chaCtrl, string setKey, CharaDetailInfo dInfo)
+        {
+            // get hair PartsNo
+            //Console.WriteLine("\nStart render hair bundle, setKey = {0}", setKey);
+            List<string> setKeyToPartsNo = new List<string>() { "Hair#BackHair", "Hair#FrontHair", "Hair#SideHair", "Hair#ExtensionHair" };
+            HairBundleDetailSet.PartsNo = setKeyToPartsNo.IndexOf(setKey);
+            if (HairBundleDetailSet.PartsNo == -1)
+            {
+                return;
+            }
+            //Console.WriteLine("Parts no = {0}, dInfo Key = {1}", HairBundleDetailSet.PartsNo, dInfo.DetailDefine.Key);
+
+            // current
+            Dictionary<int, float[]> bundleSetDict = (Dictionary<int, float[]>)dInfo.DetailDefine.Get(chaCtrl);
+            if (bundleSetDict == null)
+            {
+                return;
+            }
+
+            // revert
+            Dictionary<int, float[]> revBundleSetDict = (Dictionary<int, float[]>)dInfo.RevertValue;
+            //Console.WriteLine("Parts revBundleSetDict = {0}", revBundleSetDict);
+
+            foreach (int i in bundleSetDict.Keys)
+            {
+                HairBundleDetailSet.BundleKey = i;
+                string bundlename = string.Format("Bundle {0} Adjust", i);
+                float[] revValues = null;
+                if (revBundleSetDict != null && revBundleSetDict.ContainsKey(i))
+                {
+                    revValues = revBundleSetDict[i];
+                }
+                //Console.WriteLine("bundle key = {0} revValues = {1}", i, revValues);
+
+                // render bundle detail
+                foreach (CharaHairBundleDetailDefine cDef in HairBundleDetailSet.Details)
+                {
+                    CharaDetailInfo cInfo = new CharaDetailInfo(chaCtrl, cDef);
+                    //Console.WriteLine("rendering {0}", cDef.Key);
+                    switch (cDef.Type)
+                    {
+                        case CharaDetailDefine.CharaDetailDefineType.SEPERATOR:
+                            guiRenderSeperator(chaCtrl, bundlename, cInfo);
+                            break;
+                        case CharaDetailDefine.CharaDetailDefineType.TOGGLE:
+                            cInfo.RevertValue = revValues != null ? cDef.GetRevertValue(revValues) : null;
+                            guiRenderToggle(chaCtrl, cDef.Key, cInfo);
+                            break;
+                        case CharaDetailDefine.CharaDetailDefineType.SLIDER:
+                            cInfo.RevertValue = revValues != null ? cDef.GetRevertValue(revValues) : null;
+                            guiRenderSlider(chaCtrl, cDef.Key, cInfo);
+                            break;
+                        default:
+                            GUILayout.Label(bundlename + cDef.Key + ": UNKNOWN type not implemented");
+                            break;
+                    }
+                }
+            }
         }
 
         private void guiRenderABMXSet(ChaControl chaCtrl, string name, CharaDetailInfo dInfo)

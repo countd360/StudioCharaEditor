@@ -32,6 +32,7 @@ namespace StudioCharaEditor
             SLIDER,
             COLOR,
             SELECTOR,
+            HAIR_BUNDLE,
 
             SEPERATOR,
             TOGGLE,
@@ -1313,7 +1314,7 @@ namespace StudioCharaEditor
                 Key = "Face#EyeL#PupilType",
                 Type = CharaDetailDefine.CharaDetailDefineType.SELECTOR,
                 Get = (chaCtrl) => { return chaCtrl.fileFace.pupil[0].pupilId; },
-                Set = (chaCtrl, v) => { 
+                Set = (chaCtrl, v) => {
                     chaCtrl.fileFace.pupil[0].pupilId = (int)v;
                     if (chaCtrl.fileFace.pupilSameSetting)
                     {
@@ -1328,7 +1329,7 @@ namespace StudioCharaEditor
                 Key = "Face#EyeL#PupilColor",
                 Type = CharaDetailDefine.CharaDetailDefineType.COLOR,
                 Get = (chaCtrl) => { return chaCtrl.fileFace.pupil[0].pupilColor; },
-                Set = (chaCtrl, v) => { 
+                Set = (chaCtrl, v) => {
                     chaCtrl.fileFace.pupil[0].pupilColor = (Color)v;
                     if (chaCtrl.fileFace.pupilSameSetting)
                     {
@@ -1987,10 +1988,75 @@ namespace StudioCharaEditor
                 Get = (chaCtrl) => { return chaCtrl.fileHair.parts[0].acsColorInfo[0].color; },
                 Set = (chaCtrl, v) => { chaCtrl.fileHair.parts[0].acsColorInfo[0].color = (Color)v; chaCtrl.ChangeSettingHairAcsColor(0); },
             },
+            new CharaDetailDefine
+            {
+                Key = "Hair#BackHair#MeshType",
+                Type = CharaDetailDefine.CharaDetailDefineType.SELECTOR,
+                Get = (chaCtrl) => { return chaCtrl.fileHair.parts[0].meshType; },
+                Set = (chaCtrl, v) => { chaCtrl.fileHair.parts[0].meshType = (int)v; chaCtrl.ChangeSettingHairMeshType(0); },
+                SelectorList = (chaCtrl) =>
+                {
+                    Dictionary<int, ListInfoBase> lstDict = chaCtrl.lstCtrl.GetCategoryInfo(ChaListDefine.CategoryNo.st_hairmeshptn);
+                    List<CustomSelectInfo> infoList = new List<CustomSelectInfo>();
+                    foreach (int i in lstDict.Keys)
+                    {
+                        CustomSelectInfo csi = new CustomSelectInfo();
+                        ListInfoBase lib = lstDict[i];
+                        csi.id = lib.Id;
+                        csi.name = lib.Name;
+                        csi.assetBundle = lib.GetInfo(ChaListDefine.KeyType.ThumbAB);
+                        csi.assetName = lib.GetInfo(ChaListDefine.KeyType.ThumbTex);
+                        infoList.Add(csi);
+                    }
+                    return infoList;
+                },
+            },
+            new CharaDetailDefine
+            {
+                Key = "Hair#BackHair#MeshColor",
+                Type = CharaDetailDefine.CharaDetailDefineType.COLOR,
+                Get = (chaCtrl) => { return chaCtrl.fileHair.parts[0].meshColor; },
+                Set = (chaCtrl, v) => { chaCtrl.fileHair.parts[0].meshColor = (Color)v; chaCtrl.ChangeSettingHairMeshColor(0); },
+            },
+            new CharaDetailDefine
+            {
+                Key = "Hair#BackHair#MeshW",
+                Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                Get = (chaCtrl) => { return chaCtrl.fileHair.parts[0].meshLayout.x; },
+                Set = (chaCtrl, v) => { chaCtrl.fileHair.parts[0].meshLayout = updateLayout(chaCtrl.fileHair.parts[0].meshLayout, "x", (float)v); chaCtrl.ChangeSettingHairMeshLayout(0); },
+            },
+            new CharaDetailDefine
+            {
+                Key = "Hair#BackHair#MeshH",
+                Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                Get = (chaCtrl) => { return chaCtrl.fileHair.parts[0].meshLayout.y; },
+                Set = (chaCtrl, v) => { chaCtrl.fileHair.parts[0].meshLayout = updateLayout(chaCtrl.fileHair.parts[0].meshLayout, "y", (float)v); chaCtrl.ChangeSettingHairMeshLayout(0); },
+            },
+            new CharaDetailDefine
+            {
+                Key = "Hair#BackHair#MeshX",
+                Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                Get = (chaCtrl) => { return chaCtrl.fileHair.parts[0].meshLayout.z; },
+                Set = (chaCtrl, v) => { chaCtrl.fileHair.parts[0].meshLayout = updateLayout(chaCtrl.fileHair.parts[0].meshLayout, "z", (float)v); chaCtrl.ChangeSettingHairMeshLayout(0); },
+            },
+            new CharaDetailDefine
+            {
+                Key = "Hair#BackHair#MeshY",
+                Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                Get = (chaCtrl) => { return chaCtrl.fileHair.parts[0].meshLayout.w; },
+                Set = (chaCtrl, v) => { chaCtrl.fileHair.parts[0].meshLayout = updateLayout(chaCtrl.fileHair.parts[0].meshLayout, "w", (float)v); chaCtrl.ChangeSettingHairMeshLayout(0); },
+            },
+            new CharaDetailDefine
+            {
+                Key = "Hair#BackHair#Bundles",
+                Type = CharaDetailDefine.CharaDetailDefineType.HAIR_BUNDLE,
+                Get = (chaCtrl) => { return HairBundleDetailSet.BuildBundleDataDict(chaCtrl, 0); },
+                Set = (chaCtrl, v) => { HairBundleDetailSet.RestoreBundleDataDict(chaCtrl, 0, (Dictionary<int, float[]>)v); },
+            },
             // Hair#FrontHair
             new CharaDetailDefine
             {
-                Key = "Hair#FrontHair#BackHairType",
+                Key = "Hair#FrontHair#FrontHairType",
                 Type = CharaDetailDefine.CharaDetailDefineType.SELECTOR,
                 Get = (chaCtrl) => { return chaCtrl.fileHair.parts[1].id; },
                 Set = (chaCtrl, v) => {
@@ -2049,10 +2115,75 @@ namespace StudioCharaEditor
                 Get = (chaCtrl) => { return chaCtrl.fileHair.parts[1].acsColorInfo[0].color; },
                 Set = (chaCtrl, v) => { chaCtrl.fileHair.parts[1].acsColorInfo[0].color = (Color)v; chaCtrl.ChangeSettingHairAcsColor(1); },
             },
+            new CharaDetailDefine
+            {
+                Key = "Hair#FrontHair#MeshType",
+                Type = CharaDetailDefine.CharaDetailDefineType.SELECTOR,
+                Get = (chaCtrl) => { return chaCtrl.fileHair.parts[1].meshType; },
+                Set = (chaCtrl, v) => { chaCtrl.fileHair.parts[1].meshType = (int)v; chaCtrl.ChangeSettingHairMeshType(1); },
+                SelectorList = (chaCtrl) =>
+                {
+                    Dictionary<int, ListInfoBase> lstDict = chaCtrl.lstCtrl.GetCategoryInfo(ChaListDefine.CategoryNo.st_hairmeshptn);
+                    List<CustomSelectInfo> infoList = new List<CustomSelectInfo>();
+                    foreach (int i in lstDict.Keys)
+                    {
+                        CustomSelectInfo csi = new CustomSelectInfo();
+                        ListInfoBase lib = lstDict[i];
+                        csi.id = lib.Id;
+                        csi.name = lib.Name;
+                        csi.assetBundle = lib.GetInfo(ChaListDefine.KeyType.ThumbAB);
+                        csi.assetName = lib.GetInfo(ChaListDefine.KeyType.ThumbTex);
+                        infoList.Add(csi);
+                    }
+                    return infoList;
+                },
+            },
+            new CharaDetailDefine
+            {
+                Key = "Hair#FrontHair#MeshColor",
+                Type = CharaDetailDefine.CharaDetailDefineType.COLOR,
+                Get = (chaCtrl) => { return chaCtrl.fileHair.parts[1].meshColor; },
+                Set = (chaCtrl, v) => { chaCtrl.fileHair.parts[1].meshColor = (Color)v; chaCtrl.ChangeSettingHairMeshColor(1); },
+            },
+            new CharaDetailDefine
+            {
+                Key = "Hair#FrontHair#MeshW",
+                Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                Get = (chaCtrl) => { return chaCtrl.fileHair.parts[1].meshLayout.x; },
+                Set = (chaCtrl, v) => { chaCtrl.fileHair.parts[1].meshLayout = updateLayout(chaCtrl.fileHair.parts[1].meshLayout, "x", (float)v); chaCtrl.ChangeSettingHairMeshLayout(1); },
+            },
+            new CharaDetailDefine
+            {
+                Key = "Hair#FrontHair#MeshH",
+                Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                Get = (chaCtrl) => { return chaCtrl.fileHair.parts[1].meshLayout.y; },
+                Set = (chaCtrl, v) => { chaCtrl.fileHair.parts[1].meshLayout = updateLayout(chaCtrl.fileHair.parts[1].meshLayout, "y", (float)v); chaCtrl.ChangeSettingHairMeshLayout(1); },
+            },
+            new CharaDetailDefine
+            {
+                Key = "Hair#FrontHair#MeshX",
+                Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                Get = (chaCtrl) => { return chaCtrl.fileHair.parts[1].meshLayout.z; },
+                Set = (chaCtrl, v) => { chaCtrl.fileHair.parts[1].meshLayout = updateLayout(chaCtrl.fileHair.parts[1].meshLayout, "z", (float)v); chaCtrl.ChangeSettingHairMeshLayout(1); },
+            },
+            new CharaDetailDefine
+            {
+                Key = "Hair#FrontHair#MeshY",
+                Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                Get = (chaCtrl) => { return chaCtrl.fileHair.parts[1].meshLayout.w; },
+                Set = (chaCtrl, v) => { chaCtrl.fileHair.parts[1].meshLayout = updateLayout(chaCtrl.fileHair.parts[1].meshLayout, "w", (float)v); chaCtrl.ChangeSettingHairMeshLayout(1); },
+            },
+            new CharaDetailDefine
+            {
+                Key = "Hair#FrontHair#Bundles",
+                Type = CharaDetailDefine.CharaDetailDefineType.HAIR_BUNDLE,
+                Get = (chaCtrl) => { return HairBundleDetailSet.BuildBundleDataDict(chaCtrl, 1); },
+                Set = (chaCtrl, v) => { HairBundleDetailSet.RestoreBundleDataDict(chaCtrl, 1, (Dictionary<int, float[]>)v); },
+            },
             // Hair#SideHair
             new CharaDetailDefine
             {
-                Key = "Hair#SideHair#BackHairType",
+                Key = "Hair#SideHair#SideHairType",
                 Type = CharaDetailDefine.CharaDetailDefineType.SELECTOR,
                 Get = (chaCtrl) => { return chaCtrl.fileHair.parts[2].id; },
                 Set = (chaCtrl, v) => {
@@ -2111,10 +2242,75 @@ namespace StudioCharaEditor
                 Get = (chaCtrl) => { return chaCtrl.fileHair.parts[2].acsColorInfo[0].color; },
                 Set = (chaCtrl, v) => { chaCtrl.fileHair.parts[2].acsColorInfo[0].color = (Color)v; chaCtrl.ChangeSettingHairAcsColor(2); },
             },
+            new CharaDetailDefine
+            {
+                Key = "Hair#SideHair#MeshType",
+                Type = CharaDetailDefine.CharaDetailDefineType.SELECTOR,
+                Get = (chaCtrl) => { return chaCtrl.fileHair.parts[2].meshType; },
+                Set = (chaCtrl, v) => { chaCtrl.fileHair.parts[2].meshType = (int)v; chaCtrl.ChangeSettingHairMeshType(2); },
+                SelectorList = (chaCtrl) =>
+                {
+                    Dictionary<int, ListInfoBase> lstDict = chaCtrl.lstCtrl.GetCategoryInfo(ChaListDefine.CategoryNo.st_hairmeshptn);
+                    List<CustomSelectInfo> infoList = new List<CustomSelectInfo>();
+                    foreach (int i in lstDict.Keys)
+                    {
+                        CustomSelectInfo csi = new CustomSelectInfo();
+                        ListInfoBase lib = lstDict[i];
+                        csi.id = lib.Id;
+                        csi.name = lib.Name;
+                        csi.assetBundle = lib.GetInfo(ChaListDefine.KeyType.ThumbAB);
+                        csi.assetName = lib.GetInfo(ChaListDefine.KeyType.ThumbTex);
+                        infoList.Add(csi);
+                    }
+                    return infoList;
+                },
+            },
+            new CharaDetailDefine
+            {
+                Key = "Hair#SideHair#MeshColor",
+                Type = CharaDetailDefine.CharaDetailDefineType.COLOR,
+                Get = (chaCtrl) => { return chaCtrl.fileHair.parts[2].meshColor; },
+                Set = (chaCtrl, v) => { chaCtrl.fileHair.parts[2].meshColor = (Color)v; chaCtrl.ChangeSettingHairMeshColor(2); },
+            },
+            new CharaDetailDefine
+            {
+                Key = "Hair#SideHair#MeshW",
+                Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                Get = (chaCtrl) => { return chaCtrl.fileHair.parts[2].meshLayout.x; },
+                Set = (chaCtrl, v) => { chaCtrl.fileHair.parts[2].meshLayout = updateLayout(chaCtrl.fileHair.parts[2].meshLayout, "x", (float)v); chaCtrl.ChangeSettingHairMeshLayout(2); },
+            },
+            new CharaDetailDefine
+            {
+                Key = "Hair#SideHair#MeshH",
+                Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                Get = (chaCtrl) => { return chaCtrl.fileHair.parts[2].meshLayout.y; },
+                Set = (chaCtrl, v) => { chaCtrl.fileHair.parts[2].meshLayout = updateLayout(chaCtrl.fileHair.parts[2].meshLayout, "y", (float)v); chaCtrl.ChangeSettingHairMeshLayout(2); },
+            },
+            new CharaDetailDefine
+            {
+                Key = "Hair#SideHair#MeshX",
+                Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                Get = (chaCtrl) => { return chaCtrl.fileHair.parts[2].meshLayout.z; },
+                Set = (chaCtrl, v) => { chaCtrl.fileHair.parts[2].meshLayout = updateLayout(chaCtrl.fileHair.parts[2].meshLayout, "z", (float)v); chaCtrl.ChangeSettingHairMeshLayout(2); },
+            },
+            new CharaDetailDefine
+            {
+                Key = "Hair#SideHair#MeshY",
+                Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                Get = (chaCtrl) => { return chaCtrl.fileHair.parts[2].meshLayout.w; },
+                Set = (chaCtrl, v) => { chaCtrl.fileHair.parts[2].meshLayout = updateLayout(chaCtrl.fileHair.parts[2].meshLayout, "w", (float)v); chaCtrl.ChangeSettingHairMeshLayout(2); },
+            },
+            new CharaDetailDefine
+            {
+                Key = "Hair#SideHair#Bundles",
+                Type = CharaDetailDefine.CharaDetailDefineType.HAIR_BUNDLE,
+                Get = (chaCtrl) => { return HairBundleDetailSet.BuildBundleDataDict(chaCtrl, 2); },
+                Set = (chaCtrl, v) => { HairBundleDetailSet.RestoreBundleDataDict(chaCtrl, 2, (Dictionary<int, float[]>)v); },
+            },
             // Hair#ExtensionHair
             new CharaDetailDefine
             {
-                Key = "Hair#ExtensionHair#BackHairType",
+                Key = "Hair#ExtensionHair#ExtensionHairType",
                 Type = CharaDetailDefine.CharaDetailDefineType.SELECTOR,
                 Get = (chaCtrl) => { return chaCtrl.fileHair.parts[3].id; },
                 Set = (chaCtrl, v) => {
@@ -2173,6 +2369,71 @@ namespace StudioCharaEditor
                 Get = (chaCtrl) => { return chaCtrl.fileHair.parts[3].acsColorInfo[0].color; },
                 Set = (chaCtrl, v) => { chaCtrl.fileHair.parts[3].acsColorInfo[0].color = (Color)v; chaCtrl.ChangeSettingHairAcsColor(3); },
             },
+            new CharaDetailDefine
+            {
+                Key = "Hair#ExtensionHair#MeshType",
+                Type = CharaDetailDefine.CharaDetailDefineType.SELECTOR,
+                Get = (chaCtrl) => { return chaCtrl.fileHair.parts[3].meshType; },
+                Set = (chaCtrl, v) => { chaCtrl.fileHair.parts[3].meshType = (int)v; chaCtrl.ChangeSettingHairMeshType(3); },
+                SelectorList = (chaCtrl) =>
+                {
+                    Dictionary<int, ListInfoBase> lstDict = chaCtrl.lstCtrl.GetCategoryInfo(ChaListDefine.CategoryNo.st_hairmeshptn);
+                    List<CustomSelectInfo> infoList = new List<CustomSelectInfo>();
+                    foreach (int i in lstDict.Keys)
+                    {
+                        CustomSelectInfo csi = new CustomSelectInfo();
+                        ListInfoBase lib = lstDict[i];
+                        csi.id = lib.Id;
+                        csi.name = lib.Name;
+                        csi.assetBundle = lib.GetInfo(ChaListDefine.KeyType.ThumbAB);
+                        csi.assetName = lib.GetInfo(ChaListDefine.KeyType.ThumbTex);
+                        infoList.Add(csi);
+                    }
+                    return infoList;
+                },
+            },
+            new CharaDetailDefine
+            {
+                Key = "Hair#ExtensionHair#MeshColor",
+                Type = CharaDetailDefine.CharaDetailDefineType.COLOR,
+                Get = (chaCtrl) => { return chaCtrl.fileHair.parts[3].meshColor; },
+                Set = (chaCtrl, v) => { chaCtrl.fileHair.parts[3].meshColor = (Color)v; chaCtrl.ChangeSettingHairMeshColor(3); },
+            },
+            new CharaDetailDefine
+            {
+                Key = "Hair#ExtensionHair#MeshW",
+                Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                Get = (chaCtrl) => { return chaCtrl.fileHair.parts[3].meshLayout.x; },
+                Set = (chaCtrl, v) => { chaCtrl.fileHair.parts[3].meshLayout = updateLayout(chaCtrl.fileHair.parts[3].meshLayout, "x", (float)v); chaCtrl.ChangeSettingHairMeshLayout(3); },
+            },
+            new CharaDetailDefine
+            {
+                Key = "Hair#ExtensionHair#MeshH",
+                Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                Get = (chaCtrl) => { return chaCtrl.fileHair.parts[3].meshLayout.y; },
+                Set = (chaCtrl, v) => { chaCtrl.fileHair.parts[3].meshLayout = updateLayout(chaCtrl.fileHair.parts[3].meshLayout, "y", (float)v); chaCtrl.ChangeSettingHairMeshLayout(3); },
+            },
+            new CharaDetailDefine
+            {
+                Key = "Hair#ExtensionHair#MeshX",
+                Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                Get = (chaCtrl) => { return chaCtrl.fileHair.parts[3].meshLayout.z; },
+                Set = (chaCtrl, v) => { chaCtrl.fileHair.parts[3].meshLayout = updateLayout(chaCtrl.fileHair.parts[3].meshLayout, "z", (float)v); chaCtrl.ChangeSettingHairMeshLayout(3); },
+            },
+            new CharaDetailDefine
+            {
+                Key = "Hair#ExtensionHair#MeshY",
+                Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                Get = (chaCtrl) => { return chaCtrl.fileHair.parts[3].meshLayout.w; },
+                Set = (chaCtrl, v) => { chaCtrl.fileHair.parts[3].meshLayout = updateLayout(chaCtrl.fileHair.parts[3].meshLayout, "w", (float)v); chaCtrl.ChangeSettingHairMeshLayout(3); },
+            },
+            new CharaDetailDefine
+            {
+                Key = "Hair#ExtensionHair#Bundles",
+                Type = CharaDetailDefine.CharaDetailDefineType.HAIR_BUNDLE,
+                Get = (chaCtrl) => { return HairBundleDetailSet.BuildBundleDataDict(chaCtrl, 3); },
+                Set = (chaCtrl, v) => { HairBundleDetailSet.RestoreBundleDataDict(chaCtrl, 3, (Dictionary<int, float[]>)v); },
+            },
             #endregion
         };
 
@@ -2192,6 +2453,168 @@ namespace StudioCharaEditor
     }
 
     /*
+     *  Detail set for hair bundle
+     */
+    class CharaHairBundleDetailDefine : CharaDetailDefine
+    {
+        public delegate object GetRevertValueFunc(float[] bundleSet);
+        public GetRevertValueFunc GetRevertValue;
+    }
+
+    class HairBundleDetailSet
+    {
+        public static int PartsNo;
+        public static int BundleKey;
+
+        public static Dictionary<int, float[]> BuildBundleDataDict(ChaControl chaCtrl, int partsNo)
+        {
+            Dictionary<int, float[]> bundleDataDict = new Dictionary<int, float[]>();
+            foreach (int i in chaCtrl.fileHair.parts[partsNo].dictBundle.Keys)
+            {
+                ChaFileHair.PartsInfo.BundleInfo binfo = chaCtrl.fileHair.parts[partsNo].dictBundle[i];
+                float[] bset = new float[7];
+                bset[0] = binfo.noShake ? 1 : 0;
+                bset[1] = binfo.moveRate.x;
+                bset[2] = binfo.moveRate.y;
+                bset[3] = binfo.moveRate.z;
+                bset[4] = binfo.rotRate.x;
+                bset[5] = binfo.rotRate.y;
+                bset[6] = binfo.rotRate.z;
+                bundleDataDict[i] = bset;
+            }
+            return bundleDataDict;
+        }
+
+        public static void RestoreBundleDataDict(ChaControl chaCtrl, int partsNo, Dictionary<int, float[]> value)
+        {
+            if (value == null)
+            {
+                return;
+            }
+            foreach (int i in value.Keys)
+            {
+                if (chaCtrl.fileHair.parts[partsNo].dictBundle.ContainsKey(i))
+                {
+                    ChaFileHair.PartsInfo.BundleInfo binfo = chaCtrl.fileHair.parts[partsNo].dictBundle[i];
+                    binfo.noShake = value[i][0] == 1;
+                    binfo.moveRate = new Vector3(value[i][1], value[i][2], value[i][3]);
+                    binfo.rotRate = new Vector3(value[i][4], value[i][5], value[i][6]);
+                }
+            }
+            chaCtrl.ChangeSettingHairCorrectPosAll(partsNo);
+            chaCtrl.ChangeSettingHairCorrectRotAll(partsNo);
+        }
+
+        public static void UpdateMoveRate(ChaControl chaCtrl, string seg, float v)
+        {
+            Vector3 oldV = chaCtrl.fileHair.parts[PartsNo].dictBundle[BundleKey].moveRate;
+            Vector3 newV;
+            if (seg.Equals("x"))
+            {
+                newV = new Vector3(v, oldV.y, oldV.z);
+            }
+            else if (seg.Equals("y"))
+            {
+                newV = new Vector3(oldV.x, v, oldV.z);
+            }
+            else
+            {
+                newV = new Vector3(oldV.x, oldV.y, v);
+            }
+            chaCtrl.fileHair.parts[PartsNo].dictBundle[BundleKey].moveRate = newV;
+            chaCtrl.ChangeSettingHairCorrectPos(PartsNo, BundleKey);
+        }
+
+        public static void UpdateRotateRate(ChaControl chaCtrl, string seg, float v)
+        {
+            Vector3 oldV = chaCtrl.fileHair.parts[PartsNo].dictBundle[BundleKey].rotRate;
+            Vector3 newV;
+            if (seg.Equals("x"))
+            {
+                newV = new Vector3(v, oldV.y, oldV.z);
+            }
+            else if (seg.Equals("y"))
+            {
+                newV = new Vector3(oldV.x, v, oldV.z);
+            }
+            else
+            {
+                newV = new Vector3(oldV.x, oldV.y, v);
+            }
+            chaCtrl.fileHair.parts[PartsNo].dictBundle[BundleKey].rotRate = newV;
+            chaCtrl.ChangeSettingHairCorrectRot(PartsNo, BundleKey);
+        }
+
+        public static CharaHairBundleDetailDefine[] Details =
+        {
+            new CharaHairBundleDetailDefine
+            {
+                Key = "Title",
+                Type = CharaDetailDefine.CharaDetailDefineType.SEPERATOR,
+            },
+            new CharaHairBundleDetailDefine
+            {
+                Key = "NoShake",
+                Type = CharaDetailDefine.CharaDetailDefineType.TOGGLE,
+                Get = (chaCtrl) => { return chaCtrl.fileHair.parts[PartsNo].dictBundle[BundleKey].noShake ? (float)1 : (float)0; },
+                Set = (chaCtrl, v) => { chaCtrl.fileHair.parts[PartsNo].dictBundle[BundleKey].noShake = v.GetType() == typeof(bool) ? (bool)v : (float)v == 1; },
+                GetRevertValue = (bundleSet) => { return bundleSet[0]; },
+            },
+            new CharaHairBundleDetailDefine
+            {
+                Key = "MoveX",
+                Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                Get = (chaCtrl) => { return chaCtrl.fileHair.parts[PartsNo].dictBundle[BundleKey].moveRate.x; },
+                Set = (chaCtrl, v) => { UpdateMoveRate(chaCtrl, "x", (float)v); },
+                GetRevertValue = (bundleSet) => { return bundleSet[1]; },
+            },
+            new CharaHairBundleDetailDefine
+            {
+                Key = "MoveY",
+                Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                Get = (chaCtrl) => { return chaCtrl.fileHair.parts[PartsNo].dictBundle[BundleKey].moveRate.y; },
+                Set = (chaCtrl, v) => { UpdateMoveRate(chaCtrl, "y", (float)v); },
+                GetRevertValue = (bundleSet) => { return bundleSet[2]; },
+            },
+            new CharaHairBundleDetailDefine
+            {
+                Key = "MoveZ",
+                Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                Get = (chaCtrl) => { return chaCtrl.fileHair.parts[PartsNo].dictBundle[BundleKey].moveRate.z; },
+                Set = (chaCtrl, v) => { UpdateMoveRate(chaCtrl, "z", (float)v); },
+                GetRevertValue = (bundleSet) => { return bundleSet[3]; },
+            },
+            new CharaHairBundleDetailDefine
+            {
+                Key = "RotateX",
+                Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                Get = (chaCtrl) => { return chaCtrl.fileHair.parts[PartsNo].dictBundle[BundleKey].rotRate.x; },
+                Set = (chaCtrl, v) => { UpdateRotateRate(chaCtrl, "x", (float)v); },
+                GetRevertValue = (bundleSet) => { return bundleSet[4]; },
+            },
+            new CharaHairBundleDetailDefine
+            {
+                Key = "RotateY",
+                Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                Get = (chaCtrl) => { return chaCtrl.fileHair.parts[PartsNo].dictBundle[BundleKey].rotRate.y; },
+                Set = (chaCtrl, v) => { UpdateRotateRate(chaCtrl, "y", (float)v); },
+                GetRevertValue = (bundleSet) => { return bundleSet[5]; },
+            },
+            new CharaHairBundleDetailDefine
+            {
+                Key = "RotateZ",
+                Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                Get = (chaCtrl) => { return chaCtrl.fileHair.parts[PartsNo].dictBundle[BundleKey].rotRate.z; },
+                Set = (chaCtrl, v) => { UpdateRotateRate(chaCtrl, "z", (float)v); },
+                GetRevertValue = (bundleSet) => { return bundleSet[6]; },
+            },
+        };
+    }
+
+    /*
+     * PushUp
+     * 
+    
     class PushUpDetailSet
     {
         public static bool CheckPushupEnable(ChaControl chaCtrl)

@@ -17,6 +17,7 @@ namespace StudioCharaEditor
         public OCIChar ociTarget;
         public Dictionary<string, CharaDetailInfo> myDetailDict;
         public Dictionary<string, string[]> myDetailSet;
+        public List<string> myUpdateSequence;
         public bool hairSameColor;
         public bool hairAutoColor;
 
@@ -122,6 +123,7 @@ namespace StudioCharaEditor
         {
             ChaControl chaCtrl = ociTarget.charInfo;
             myDetailDict = new Dictionary<string, CharaDetailInfo>();
+            myUpdateSequence = new List<string>();
             Dictionary<string, List<string>> detailSetTemp = new Dictionary<string, List<string>>();
             string[] myExcludeList = CharaDetailSet.ExcludeKeys[chaCtrl.sex];
 
@@ -148,6 +150,7 @@ namespace StudioCharaEditor
                 if (myDetail.RevertValue != null)
                 {
                     myDetailDict[cdi.Key] = myDetail;
+                    myUpdateSequence.Add(cdi.Key);
                     addToDetailSetTemp(cdi.Key);
                 }
             }
@@ -170,6 +173,7 @@ namespace StudioCharaEditor
                 foreach (CharaDetailDefine cdi in BoobSettingDetailSet.Details)
                 {
                     myDetailDict[cdi.Key] = new CharaDetailInfo(chaCtrl, cdi);
+                    myUpdateSequence.Add(cdi.Key);
                     addToDetailSetTemp(cdi.Key);
                 }
             }
@@ -180,6 +184,7 @@ namespace StudioCharaEditor
                 foreach (CharaDetailDefine cdi in AMBXSettingDetailSet.Details)
                 {
                     myDetailDict[cdi.Key] = new CharaDetailInfo(chaCtrl, cdi);
+                    myUpdateSequence.Add(cdi.Key);
                     addToDetailSetTemp(cdi.Key);
                 }
             }
@@ -419,9 +424,13 @@ namespace StudioCharaEditor
 
         public void SetDataDict(Dictionary<string, object> data, bool force = false)
         {
-            foreach (string key in data.Keys)
+            if (data == null)
             {
-                if (myDetailDict.ContainsKey(key))
+                return;
+            }
+            foreach (string key in myUpdateSequence)
+            {
+                if (data.ContainsKey(key) && myDetailDict.ContainsKey(key))
                 {
                     if (force)
                     {
