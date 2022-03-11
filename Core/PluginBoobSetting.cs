@@ -123,9 +123,9 @@ namespace StudioCharaEditor
             {
                 Key = "Body#ShapeLower#OverridePhysics",
                 Type = CharaDetailDefine.CharaDetailDefineType.TOGGLE,
-                Get = (chaCtrl) => { return GetBoolValue(chaCtrl, "overridePhysics"); },
+                Get = (chaCtrl) => { return GetBoolValue(chaCtrl, BoobController.BUTT+"overridePhysics"); },
                 Set = (chaCtrl, v) => {
-                    SetBoolValue(chaCtrl, "overridePhysics", (bool)v);
+                    SetBoolValue(chaCtrl, BoobController.BUTT+"overridePhysics", (bool)v);
                     if ((bool)v)
                     {
                         chaCtrl.UpdateBustSoftness();
@@ -142,9 +142,9 @@ namespace StudioCharaEditor
             {
                 Key = "Body#ShapeLower#OverrideGravity",
                 Type = CharaDetailDefine.CharaDetailDefineType.TOGGLE,
-                Get = (chaCtrl) => { return GetBoolValue(chaCtrl, "overrideGravity"); },
+                Get = (chaCtrl) => { return GetBoolValue(chaCtrl, BoobController.BUTT+"overrideGravity"); },
                 Set = (chaCtrl, v) => {
-                    SetBoolValue(chaCtrl, "overrideGravity", (bool)v);
+                    SetBoolValue(chaCtrl, BoobController.BUTT+"overrideGravity", (bool)v);
                     if ((bool)v)
                     {
                         chaCtrl.UpdateBustGravity();
@@ -160,50 +160,50 @@ namespace StudioCharaEditor
             {
                 Key = "Body#ShapeLower#Damping",
                 Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
-                Get = (chaCtrl) => { return GetFloatValue(chaCtrl, "damping"); },
-                Set = (chaCtrl, v) => { SetFloatValue(chaCtrl, "damping", (float)v); chaCtrl.UpdateBustSoftness(); },
+                Get = (chaCtrl) => { return GetFloatValue(chaCtrl, BoobController.BUTT+"damping"); },
+                Set = (chaCtrl, v) => { SetFloatValue(chaCtrl, BoobController.BUTT+"damping", (float)v); chaCtrl.UpdateBustSoftness(); },
             },
             new CharaBoobSettingDetailDefine
             {
                 Key = "Body#ShapeLower#Elasticity",
                 Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
-                Get = (chaCtrl) => { return GetFloatValue(chaCtrl, "elasticity"); },
-                Set = (chaCtrl, v) => { SetFloatValue(chaCtrl, "elasticity", (float)v); chaCtrl.UpdateBustSoftness(); },
+                Get = (chaCtrl) => { return GetFloatValue(chaCtrl, BoobController.BUTT+"elasticity"); },
+                Set = (chaCtrl, v) => { SetFloatValue(chaCtrl, BoobController.BUTT+"elasticity", (float)v); chaCtrl.UpdateBustSoftness(); },
             },
             new CharaBoobSettingDetailDefine
             {
                 Key = "Body#ShapeLower#Stiffness",
                 Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
-                Get = (chaCtrl) => { return GetFloatValue(chaCtrl, "stiffness"); },
-                Set = (chaCtrl, v) => { SetFloatValue(chaCtrl, "stiffness", (float)v); chaCtrl.UpdateBustSoftness(); },
+                Get = (chaCtrl) => { return GetFloatValue(chaCtrl, BoobController.BUTT+"stiffness"); },
+                Set = (chaCtrl, v) => { SetFloatValue(chaCtrl, BoobController.BUTT+"stiffness", (float)v); chaCtrl.UpdateBustSoftness(); },
             },
             new CharaBoobSettingDetailDefine
             {
                 Key = "Body#ShapeLower#Inert",
                 Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
-                Get = (chaCtrl) => { return GetFloatValue(chaCtrl, "inert"); },
-                Set = (chaCtrl, v) => { SetFloatValue(chaCtrl, "inert", (float)v); chaCtrl.UpdateBustSoftness(); },
+                Get = (chaCtrl) => { return GetFloatValue(chaCtrl, BoobController.BUTT+"inert"); },
+                Set = (chaCtrl, v) => { SetFloatValue(chaCtrl, BoobController.BUTT+"inert", (float)v); chaCtrl.UpdateBustSoftness(); },
             },
             new CharaBoobSettingDetailDefine
             {
                 Key = "Body#ShapeLower#GravityX",
                 Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
-                Get = (chaCtrl) => { return GetFloatValue(chaCtrl, "gravityX") * 100.0f; },
-                Set = (chaCtrl, v) => { SetFloatValue(chaCtrl, "gravityX", (float)v / 100.0f); chaCtrl.UpdateBustGravity();},
+                Get = (chaCtrl) => { return GetFloatValue(chaCtrl, BoobController.BUTT+"gravityX") * 100.0f; },
+                Set = (chaCtrl, v) => { SetFloatValue(chaCtrl, BoobController.BUTT+"gravityX", (float)v / 100.0f); chaCtrl.UpdateBustGravity();},
             },
             new CharaBoobSettingDetailDefine
             {
                 Key = "Body#ShapeLower#GravityY",
                 Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
-                Get = (chaCtrl) => { return GetFloatValue(chaCtrl, "gravityY") * 100.0f; },
-                Set = (chaCtrl, v) => { SetFloatValue(chaCtrl, "gravityY", (float)v / 100.0f); chaCtrl.UpdateBustGravity();},
+                Get = (chaCtrl) => { return GetFloatValue(chaCtrl, BoobController.BUTT+"gravityY") * 100.0f; },
+                Set = (chaCtrl, v) => { SetFloatValue(chaCtrl, BoobController.BUTT+"gravityY", (float)v / 100.0f); chaCtrl.UpdateBustGravity();},
             },
             new CharaBoobSettingDetailDefine
             {
                 Key = "Body#ShapeLower#GravityZ",
                 Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
-                Get = (chaCtrl) => { return GetFloatValue(chaCtrl, "gravityZ") * 100.0f; },
-                Set = (chaCtrl, v) => { SetFloatValue(chaCtrl, "gravityZ", (float)v / 100.0f); chaCtrl.UpdateBustGravity();},
+                Get = (chaCtrl) => { return GetFloatValue(chaCtrl, BoobController.BUTT+"gravityZ") * 100.0f; },
+                Set = (chaCtrl, v) => { SetFloatValue(chaCtrl, BoobController.BUTT+"gravityZ", (float)v / 100.0f); chaCtrl.UpdateBustGravity();},
             },
         };
     }
