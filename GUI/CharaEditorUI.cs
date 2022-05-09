@@ -576,6 +576,16 @@ namespace StudioCharaEditor
                 }
                 GUILayout.EndHorizontal();
             }
+
+            // close btn
+            Rect cbRect = new Rect(windowRect.width - 16, 3, 13, 13);
+            Color oldColor = GUI.color;
+            GUI.color = Color.red;
+            if (GUI.Button(cbRect, ""))
+            {
+                VisibleGUI = false;
+            }
+            GUI.color = oldColor;
         }
 
         private void guiRenderSlider(ChaControl chaCtrl, string name, CharaDetailInfo dInfo)
@@ -1215,6 +1225,30 @@ namespace StudioCharaEditor
                 }
             }
             GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button(LC("Capture thumbnail photo 2"), btnstyle))
+            {
+                int capW = 1280;
+                int capH = 720;
+                int savW = 504;
+                int savH = 704;
+
+                byte[] capBuf = Studio.Studio.Instance.gameScreenShot.CreatePngScreen(capW, capH);
+                Texture2D capTex = new Texture2D(2, 2, TextureFormat.ARGB32, false);
+                capTex.LoadImage(capBuf);
+                Color[] capPixels = capTex.GetPixels((capW - savW) / 2, (capH - savH) / 2, savW, savH, 0);
+
+                savingTexture = new Texture2D(savW, savH);
+                savingTexture.SetPixels(capPixels);
+                savingTexture.Apply();
+
+                // shink size
+                if (!StudioCharaEditor.DoubleThumbnailSize.Value)
+                {
+                    TextureScale.Bilinear(savingTexture, savW / 2, savH / 2);
+                }
+            }
+            GUILayout.EndHorizontal();
             GUILayout.EndVertical();
             GUILayout.EndHorizontal();
 
@@ -1259,6 +1293,16 @@ namespace StudioCharaEditor
                 guiMode = GuiModeType.MAIN;
             }
             GUILayout.EndHorizontal();
+
+            // close btn
+            Rect cbRect = new Rect(windowRect.width - 16, 3, 13, 13);
+            Color oldColor = GUI.color;
+            GUI.color = Color.red;
+            if (GUI.Button(cbRect, ""))
+            {
+                VisibleGUI = false;
+            }
+            GUI.color = oldColor;
         }
 
         private void OnSelectChange(TreeNodeObject newSel)

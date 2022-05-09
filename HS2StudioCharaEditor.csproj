@@ -32,29 +32,31 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="0Harmony">
-      <HintPath>..\..\..\..\..\ill\HoneySelect 2\BepInEx\core\0Harmony.dll</HintPath>
+      <HintPath>libdll\0Harmony.dll</HintPath>
     </Reference>
     <Reference Include="Assembly-CSharp">
-      <HintPath>..\..\..\..\..\ill\HoneySelect 2\StudioNEOV2_Data\Managed\Assembly-CSharp.dll</HintPath>
+      <HintPath>libdll\Assembly-CSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="Assembly-CSharp-firstpass">
+      <HintPath>libdll\Assembly-CSharp-firstpass.dll</HintPath>
     </Reference>
     <Reference Include="BepInEx">
-      <HintPath>..\..\..\..\..\ill\HoneySelect 2\BepInEx\core\BepInEx.dll</HintPath>
+      <HintPath>libdll\BepInEx.dll</HintPath>
     </Reference>
     <Reference Include="HS2ABMX">
-      <HintPath>..\..\..\..\..\ill\HoneySelect 2\BepInEx\Plugins\HS2ABMX.dll</HintPath>
+      <HintPath>libdll\HS2ABMX.dll</HintPath>
     </Reference>
     <Reference Include="HS2API">
-      <HintPath>..\..\..\..\..\ill\HoneySelect 2\BepInEx\Plugins\HS2API.dll</HintPath>
+      <HintPath>libdll\HS2API.dll</HintPath>
     </Reference>
     <Reference Include="HS2_BoobSettings">
-      <HintPath>..\..\..\..\..\ill\HoneySelect 2\BepInEx\Plugins\HS2_BoobSettings.dll</HintPath>
+      <HintPath>libdll\HS2_BoobSettings.dll</HintPath>
     </Reference>
     <Reference Include="IL">
-      <HintPath>..\..\..\..\..\ill\HoneySelect 2\StudioNEOV2_Data\Managed\IL.dll</HintPath>
+      <HintPath>libdll\IL.dll</HintPath>
     </Reference>
     <Reference Include="PushUpAI">
-      <HintPath>..\..\..\..\..\ill\HoneySelect 2\BepInEx\Plugins\PushUpAI.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>libdll\PushUpAI.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -66,24 +68,24 @@
     <Reference Include="System.Xml" />
     <Reference Include="UniRx, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\..\ill\HoneySelect 2\StudioNEOV2_Data\Managed\UniRx.dll</HintPath>
+      <HintPath>libdll\UniRx.dll</HintPath>
     </Reference>
     <Reference Include="UnityEngine">
-      <HintPath>..\..\..\..\..\ill\HoneySelect 2\StudioNEOV2_Data\Managed\UnityEngine.dll</HintPath>
+      <HintPath>libdll\UnityEngine.dll</HintPath>
     </Reference>
     <Reference Include="UnityEngine.CoreModule">
-      <HintPath>..\..\..\..\..\ill\HoneySelect 2\StudioNEOV2_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+      <HintPath>libdll\UnityEngine.CoreModule.dll</HintPath>
     </Reference>
     <Reference Include="UnityEngine.ImageConversionModule, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\..\ill\HoneySelect 2\StudioNEOV2_Data\Managed\UnityEngine.ImageConversionModule.dll</HintPath>
+      <HintPath>libdll\UnityEngine.ImageConversionModule.dll</HintPath>
     </Reference>
     <Reference Include="UnityEngine.IMGUIModule">
-      <HintPath>..\..\..\..\..\ill\HoneySelect 2\StudioNEOV2_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
+      <HintPath>libdll\UnityEngine.IMGUIModule.dll</HintPath>
     </Reference>
     <Reference Include="UnityEngine.TextRenderingModule, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\..\ill\HoneySelect 2\StudioNEOV2_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
+      <HintPath>libdll\UnityEngine.TextRenderingModule.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
@@ -98,6 +100,7 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>copy $(TargetPath) "C:\ill\HoneySelect 2\BepInEx\Plugins\" /Y</PostBuildEvent>
+    <PostBuildEvent>
+    </PostBuildEvent>
   </PropertyGroup>
 </Project>
