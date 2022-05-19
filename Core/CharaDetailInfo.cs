@@ -1872,8 +1872,8 @@ namespace StudioCharaEditor
             {
                 Key = "Face#MakeupPaint2#PaintGloss",
                 Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
-                Get = (chaCtrl) => { return chaCtrl.fileFace.makeup.paintInfo[0].glossPower; },
-                Set = (chaCtrl, v) => { chaCtrl.fileFace.makeup.paintInfo[0].glossPower = (float)v; chaCtrl.AddUpdateCMFaceGlossFlags(false, true, true, false, false); chaCtrl.AddUpdateCMFaceTexFlags(false, true, true, true, true, true, true); },
+                Get = (chaCtrl) => { return chaCtrl.fileFace.makeup.paintInfo[1].glossPower; },
+                Set = (chaCtrl, v) => { chaCtrl.fileFace.makeup.paintInfo[1].glossPower = (float)v; chaCtrl.AddUpdateCMFaceGlossFlags(false, true, true, false, false); chaCtrl.AddUpdateCMFaceTexFlags(false, true, true, true, true, true, true); },
                 Upd = (chaCtrl) => { chaCtrl.CreateFaceTexture(); },
             },
             new CharaDetailDefine
