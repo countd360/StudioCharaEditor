@@ -52,8 +52,14 @@
     <Reference Include="HS2_BoobSettings">
       <HintPath>libdll\HS2_BoobSettings.dll</HintPath>
     </Reference>
+    <Reference Include="HS2_OverlayMods">
+      <HintPath>libdll\HS2_OverlayMods.dll</HintPath>
+    </Reference>
     <Reference Include="IL">
       <HintPath>libdll\IL.dll</HintPath>
+    </Reference>
+    <Reference Include="MoreAccessories">
+      <HintPath>libdll\MoreAccessories.dll</HintPath>
     </Reference>
     <Reference Include="PushUpAI">
       <HintPath>libdll\PushUpAI.dll</HintPath>
@@ -94,6 +100,8 @@
     <Compile Include="Core\CharaEditorMgr.cs" />
     <Compile Include="Core\PluginABMX.cs" />
     <Compile Include="Core\PluginBoobSetting.cs" />
+    <Compile Include="Core\PluginMoreAccessories.cs" />
+    <Compile Include="Core\PluginOverlay.cs" />
     <Compile Include="GUI\CharaEditorUI.cs" />
     <Compile Include="StudioCharaEditor.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

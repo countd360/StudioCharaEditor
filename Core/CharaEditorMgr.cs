@@ -62,6 +62,37 @@ namespace StudioCharaEditor
             // check extra plugins
         }
 
+        public void ResetGUI()
+        {
+            gui.ResetGui();
+        }
+
+        public void HouseKeeping(bool isVisible)
+        {
+            // release deleted controller
+            if (isVisible)
+            {
+                foreach (OCIChar ociChar in charaEditorCtrlDict.Keys)
+                {
+                    if (ociChar.charInfo == null)
+                    {
+                        Console.WriteLine("Remove controller for deleted chara");
+                        charaEditorCtrlDict.Remove(ociChar);
+                        return;
+                    }
+                }
+            }
+
+            // housekeeping for controller
+            if (isVisible)
+            {
+                foreach (var ctrl in charaEditorCtrlDict.Values)
+                {
+                    ctrl.RefreshAccessoriesListIfExpired();
+                }
+            }
+        }
+
         public CharaEditorController GetEditorController(OCIChar ociTarget)
         {
             if (ociTarget == null)
@@ -90,14 +121,14 @@ namespace StudioCharaEditor
 
         public void ReloadDictionary()
         {
-            loadExtendSetting();
+            LoadExtendSetting();
             if (gui != null)
             {
                 gui.curLocalizationDict = AssignLocalizeDict();
             }
         }
 
-        public void loadExtendSetting()
+        public void LoadExtendSetting()
         {
             try
             {

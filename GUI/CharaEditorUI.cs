@@ -30,14 +30,16 @@ namespace StudioCharaEditor
         private OCIChar ociTarget;
         private Dictionary<string, object> clipboard;
         private bool renameMode = false;
+        private bool searchingMode = false;
         private string tempCharaName;
         private int catelogIndex1;
-        private int[] catelogIndex2 = new int[] { 1, 1, 2 };
+        private int[] catelogIndex2 = new int[] { 1, 1, 2, 0, 0 };
         private SelectMode detailPageSelect = SelectMode.Normal;
         private Dictionary<string, bool> selectBuffer = new Dictionary<string, bool>();
         private Dictionary<string, Vector2> scrollPool = new Dictionary<string, Vector2>();
         private Dictionary<string, bool> expandPool = new Dictionary<string, bool>();
-        private Dictionary<string, Texture2D[]> thumbPool = new Dictionary<string, Texture2D[]>();
+        private Dictionary<string, Dictionary<string, Texture2D>> thumbPool = new Dictionary<string, Dictionary<string, Texture2D>>();
+        private Dictionary<string, string> searchWordPool = new Dictionary<string, string>();
 
         // save
         private OCIChar savingChara;
@@ -52,7 +54,11 @@ namespace StudioCharaEditor
         private Vector2 rightScroll = Vector2.zero;
         private int namew = 100;
         private float thumbSize = 100;
+        private float thumbSizeSmall = 70;
         private float thumbBtnHeight = 40;
+
+        // work
+        public static Queue<Action> ToDoQueue = new Queue<Action>();
 
         enum GuiModeType
         {
@@ -64,72 +70,23 @@ namespace StudioCharaEditor
         // Localize
         public Dictionary<string, string> curLocalizationDict;
 
-        // GUI const
-        readonly string[] CATELOG1 = { "Body", "Face", "Hair" };
-        readonly Dictionary<string, string[]> CATELOG2 = new Dictionary<string, string[]>
-        {
-            {"Body", new string[] {
-                    "==SHAPE==",
-                    "ShapeWhole",
-                    "ShapeBreast",
-                    "ShapeUpper",
-                    "ShapeLower",
-                    "ShapeArm",
-                    "ShapeLeg",
-                    "==SKIN==",
-                    "Skin",
-                    "Sunburn",
-                    "Nip",
-                    "Underhair",
-                    "Nail",
-                    "Paint1",
-                    "Paint2",
-                }
-            },
-            {"Face", new string[] {
-                    "==FACE==",
-                    "FaceType",
-                    "ShapeWhole",
-                    "ShapeChin",
-                    "ShapeCheek",
-                    "ShapeEyebrow",
-                    "ShapeEyes",
-                    "ShapeNose",
-                    "ShapeMouth",
-                    "ShapeEar",
-                    "Mole",
-                    "Bread",
-                    "==EYES==",
-                    "++EyesSameSetting",
-                    "EyeL",
-                    "EyeR",
-                    "EyeEtc",
-                    "EyeHL",
-                    "Eyebrow",
-                    "Eyelashes",
-                    "==MAKEUP==",
-                    "MakeupEyeshadow",
-                    "MakeupCheek",
-                    "MakeupLip",
-                    "MakeupPaint1",
-                    "MakeupPaint2",
-                }
-            },
-            {"Hair", new string[] {
-                    "++ColorAutoSetting",
-                    "++ColorSameSetting",
-                    "BackHair",
-                    "FrontHair",
-                    "SideHair",
-                    "ExtensionHair",
-                }
-            },
-        };
-
+        // Control flag
         public bool VisibleGUI { get; set; }
         public bool LaterUpdate { get; set; }
 
-        private void Start()
+        public void ResetGui()
+        {
+            guiMode = GuiModeType.MAIN;
+            ociTarget = null;
+            renameMode = false;
+            searchingMode = false;
+            tempCharaName = null;
+            catelogIndex1 = 0;
+            catelogIndex2 = new int[] { 1, 1, 2, 0, 0 };
+            detailPageSelect = SelectMode.Normal;
+        }
+
+    private void Start()
         {
             largeLabel = new GUIStyle("label");
             largeLabel.fontSize = 16;
@@ -170,7 +127,7 @@ namespace StudioCharaEditor
                 if (VisibleGUI)
                 {
                     CharaEditorMgr.Instance.ReloadDictionary();
-                    windowRect = new Rect(StudioCharaEditor.UIXPosition.Value, StudioCharaEditor.UIYPosition.Value, Math.Min(600, StudioCharaEditor.UIWidth.Value), Math.Min(400, StudioCharaEditor.UIHeight.Value));
+                    windowRect = new Rect(StudioCharaEditor.UIXPosition.Value, StudioCharaEditor.UIYPosition.Value, Math.Max(600, StudioCharaEditor.UIWidth.Value), Math.Max(400, StudioCharaEditor.UIHeight.Value));
                 }
                 else
                 {
@@ -190,11 +147,20 @@ namespace StudioCharaEditor
                     OnSelectChange(curSel);
                 }
             }
+
+            // house keeping
+            CharaEditorMgr.Instance.HouseKeeping(VisibleGUI);
+
+            // check todo queue
+            if (ToDoQueue.Count > 0)
+            {
+                Action p = ToDoQueue.Dequeue();
+                p();
+            }
         }
 
         private void FuncWindowGUI(int winID)
         {
-
             try
             {
                 if (GUIUtility.hotControl == 0)
@@ -226,8 +192,7 @@ namespace StudioCharaEditor
             catch (Exception ex)
             {
                 Console.WriteLine(ex);
-                guiMode = GuiModeType.MAIN;
-                ociTarget = null;
+                ResetGui();                
             }
             finally
             {
@@ -241,6 +206,7 @@ namespace StudioCharaEditor
             float fullh = windowRect.height - 20;
             float leftw = 150;
             float rightw = fullw - 8 - leftw - 5;
+            GUIStyle cat1btnstyle = new GUIStyle("button");
 
             CharaEditorController cec = CharaEditorMgr.Instance.GetEditorController(ociTarget);
             if (ociTarget == null || cec == null)
@@ -255,19 +221,28 @@ namespace StudioCharaEditor
             }
             else
             {
+                // charactor selected
                 string curDetailSetKey = null;
 
                 GUILayout.BeginHorizontal();
-                // catelog
+
+                // LEFT area
                 GUILayout.BeginVertical(GUILayout.Width(leftw + 8));
+
+                // catelog1 select
                 GUILayout.BeginHorizontal();
-                for (int c1 = 0; c1 < CATELOG1.Length; c1++)
+                for (int c1 = 0; c1 < CharaEditorController.CATEGORY1.Length; c1++)
                 {
-                    string title = LC(CATELOG1[c1]);
+                    if (c1 == 3)
+                    {
+                        GUILayout.EndHorizontal();
+                        GUILayout.BeginHorizontal();
+                    }
+                    string title = LC(CharaEditorController.CATEGORY1[c1]);
                     Color color = GUI.color;
                     if (catelogIndex1 == c1)
                         GUI.color = Color.green;
-                    if (GUILayout.Button(title, GUILayout.Width(leftw / 3)))
+                    if (GUILayout.Button(title))
                     {
                         catelogIndex1 = c1;
                         detailPageSelect = SelectMode.Normal;
@@ -275,12 +250,18 @@ namespace StudioCharaEditor
                     GUI.color = color;
                 }
                 GUILayout.EndHorizontal();
+
+                // catelog2 select
                 leftScroll = GUILayout.BeginScrollView(leftScroll, GUI.skin.box);
-                for (int c2 = 0; c2 < CATELOG2[CATELOG1[catelogIndex1]].Length; c2++)
+                string category1 = CharaEditorController.CATEGORY1[catelogIndex1];
+                string category2 = null;
+                string[] category2List = cec.GetCategoryList(category1);
+                for (int c2 = 0; c2 < category2List.Length; c2++)
                 {
-                    string title = CATELOG2[CATELOG1[catelogIndex1]][c2];
+                    string title = category2List[c2];
                     if (title.StartsWith("=="))
                     {
+                        // seperator
                         GUILayout.BeginHorizontal();
                         GUILayout.FlexibleSpace();
                         GUILayout.Label(LC(title));
@@ -289,79 +270,104 @@ namespace StudioCharaEditor
                     }
                     else if (title.StartsWith("++"))
                     {
+                        // toggle
                         string cTitle = title.Substring(2);
-                        string checkKey = CATELOG1[catelogIndex1] + "#" + cTitle;
-                        switch (checkKey)
+                        string checkKey = category1 + "#" + cTitle;
+                        if (cec.Category2GetFuncDict.ContainsKey(checkKey))
                         {
-                            case "Face#EyesSameSetting":
-                                ociTarget.charInfo.fileFace.pupilSameSetting = GUILayout.Toggle(ociTarget.charInfo.fileFace.pupilSameSetting, LC(cTitle));
-                                break;
-                            case "Hair#ColorAutoSetting":
-                                cec.hairAutoColor = GUILayout.Toggle(cec.hairAutoColor, LC(cTitle));
-                                break;
-                            case "Hair#ColorSameSetting":
-                                cec.hairSameColor = GUILayout.Toggle(cec.hairSameColor, LC(cTitle));
-                                break;
-                            default:
-                                Console.WriteLine("Unknown ++{0}", checkKey);
-                                break;
+                            bool oldV = (bool)cec.Category2GetFuncDict[checkKey](cec);
+                            bool newV = GUILayout.Toggle(oldV, LC(title));
+                            if (oldV != newV)
+                            {
+                                cec.Category2SetFuncDict[checkKey](cec, newV);
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine("Unknown ++{0}", checkKey);
                         }
                     }
                     else
                     {
-                        string detailSetKey = CATELOG1[catelogIndex1] + "#" + CATELOG2[CATELOG1[catelogIndex1]][c2];
-                        if (cec.myDetailSet.ContainsKey(detailSetKey))
+                        // selectable button
+                        string detailSetKey = category1 + "#" + title;
+                        Color color = GUI.color;
+                        if (catelogIndex2[catelogIndex1] == c2)
                         {
-                            Color color = GUI.color;
-                            if (catelogIndex2[catelogIndex1] == c2)
-                            {
-                                GUI.color = Color.green;
-                                curDetailSetKey = detailSetKey;
-                            }
-                            if (GUILayout.Button(LC(title)))
-                            {
-                                catelogIndex2[catelogIndex1] = c2;
-                                detailPageSelect = SelectMode.Normal;
-                            }
-                            GUI.color = color;
+                            GUI.color = Color.green;
+                            category2 = title;
+                            curDetailSetKey = detailSetKey;
                         }
+                        if (catelogIndex1 == 3)
+                        {
+                            title = cec.GetClothDispName(title);
+                            cat1btnstyle.alignment = TextAnchor.MiddleCenter;                            
+                        }
+                        else if (catelogIndex1 == 4)
+                        {
+                            title = cec.GetAccessoryInfoByKey(title)?.AccName;
+                            cat1btnstyle.alignment = TextAnchor.MiddleLeft;
+                        }
+                        else
+                        {
+                            cat1btnstyle.alignment = TextAnchor.MiddleCenter;
+                        }
+                        if (GUILayout.Button(LC(title), cat1btnstyle))
+                        {
+                            catelogIndex2[catelogIndex1] = c2;
+                            detailPageSelect = SelectMode.Normal;
+                        }
+                        GUI.color = color;
                     }
                 }
                 GUILayout.EndScrollView();
-                GUILayout.BeginHorizontal(GUI.skin.box);
-                if (GUILayout.Button(LC("Copy") + " " + LC(CATELOG1[catelogIndex1])))
+
+                // category operation button
+                GUILayout.BeginVertical(GUI.skin.box);
+                if (catelogIndex1 == 4 && PluginMoreAccessories.HasMoreAccessories)
+                {
+                    GUILayout.BeginHorizontal();
+                    if (GUILayout.Button(LC("+1 Slot")))
+                    {
+                        PluginMoreAccessories.AddOneAccessorySlot(cec.ociTarget.charInfo);
+                        cec.RefreshAccessoriesList();
+                    }
+                    if (GUILayout.Button(LC("+10 Slots")))
+                    {
+                        PluginMoreAccessories.AddTenAccessorySlots(cec.ociTarget.charInfo);
+                        cec.RefreshAccessoriesList();
+                    }
+                    GUILayout.EndHorizontal();
+                }
+                if (GUILayout.Button(LC("Copy") + " " + LC(category1)))
                 {
                     List<string> tgtKeys = new List<string>();
-                    for (int c2 = 0; c2 < CATELOG2[CATELOG1[catelogIndex1]].Length; c2++)
+                    for (int c2 = 0; c2 < category2List.Length; c2++)
                     {
-                        string title = CATELOG2[CATELOG1[catelogIndex1]][c2];
-                        if (title.StartsWith("==") || title.StartsWith("++")) continue;
-
-                        string detailSetKey = CATELOG1[catelogIndex1] + "#" + CATELOG2[CATELOG1[catelogIndex1]][c2];
-                        if (cec.myDetailSet.ContainsKey(detailSetKey))
+                        string c2name = category2List[c2];
+                        if (c2name.StartsWith("==") || c2name.StartsWith("++")) continue;
+                        foreach (CharaDetailInfo cdi in cec.GetDetaiInfoList(category1, c2name))
                         {
-                            foreach (string dname in cec.myDetailSet[detailSetKey])
-                            {
-                                tgtKeys.Add(detailSetKey + "#" + dname);
-                            }
+                            tgtKeys.Add(cdi.DetailDefine.Key);
                         }
                     }
                     clipboard = cec.GetDataDictByKeys(tgtKeys.ToArray());
                 }
-                GUILayout.EndHorizontal();
+                GUILayout.EndVertical();
                 GUILayout.EndVertical();
 
-                // detail editor
+                // RIGHT area
                 if (curDetailSetKey != null)
                 {
                     GUILayout.BeginVertical(GUILayout.Width(rightw));
-                    // title line
+
+                    // chara name editor line
                     GUILayout.BeginHorizontal();
                     GUILayout.FlexibleSpace();
                     if (renameMode)
                         tempCharaName = GUILayout.TextField(tempCharaName, GUILayout.Width(200));
                     else
-                        GUILayout.Label(magentaText(ociTarget.treeNodeObject.textName) + greenText(" > " + LC(CATELOG1[catelogIndex1]) + " > " + LC(CATELOG2[CATELOG1[catelogIndex1]][catelogIndex2[catelogIndex1]])));
+                        GUILayout.Label(magentaText(ociTarget.treeNodeObject.textName) + greenText(" > " + LC(category1) + " > " + LC(category2)));
                     GUILayout.FlexibleSpace();
                     if (renameMode)
                     {
@@ -385,19 +391,21 @@ namespace StudioCharaEditor
                         }
                     }
                     GUILayout.EndHorizontal();
-                    // detials
+
+                    // chara detials editor
                     if (cec.myDetailSet.ContainsKey(curDetailSetKey))
                     {
-                        string[] dset = cec.myDetailSet[curDetailSetKey];
+                        CharaDetailInfo[] detailInfoSet = cec.GetDetaiInfoList(category1, category2);
                         Dictionary<string, object> pageClipboard = new Dictionary<string, object>();
                         // detail page scroll view
                         rightScroll = GUILayout.BeginScrollView(rightScroll, GUI.skin.box);
-                        foreach (string dname in dset)
+                        foreach (CharaDetailInfo dInfo in detailInfoSet)
                         {
-                            string dkey = curDetailSetKey + "#" + dname;
-                            CharaDetailInfo dInfo = cec.myDetailDict[dkey];
+                            string dkey = dInfo.DetailDefine.Key;
+                            string dname = dkey.Split(CharaEditorController.KEY_SEP_CHAR)[2];
                             if (detailPageSelect == SelectMode.Normal)
                             {
+                                // Setting mode
                                 ChaControl chaCtrl = ociTarget.charInfo;
                                 switch (dInfo.DetailDefine.Type)
                                 {
@@ -416,13 +424,28 @@ namespace StudioCharaEditor
                                     case CharaDetailDefine.CharaDetailDefineType.TOGGLE:
                                         guiRenderToggle(chaCtrl, dname, dInfo);
                                         break;
+                                    case CharaDetailDefine.CharaDetailDefineType.VALUEINPUT:
+                                        guiRenderValueInput(chaCtrl, dname, dInfo);
+                                        break;
+                                    case CharaDetailDefine.CharaDetailDefineType.INT_STATUS:
+                                        guiRenderIntStatus(chaCtrl, dname, dInfo);
+                                        break;
                                     case CharaDetailDefine.CharaDetailDefineType.HAIR_BUNDLE:
                                         guiRenderHairBundle(chaCtrl, curDetailSetKey, dInfo);
+                                        break;
+                                    case CharaDetailDefine.CharaDetailDefineType.BUTTON:
+                                        guiRenderButton(chaCtrl, dname, dInfo);
                                         break;
                                     case CharaDetailDefine.CharaDetailDefineType.ABMXSET1:
                                     case CharaDetailDefine.CharaDetailDefineType.ABMXSET2:
                                     case CharaDetailDefine.CharaDetailDefineType.ABMXSET3:
                                         guiRenderABMXSet(chaCtrl, dname, dInfo);
+                                        break;
+                                    case CharaDetailDefine.CharaDetailDefineType.SKIN_OVERLAY:
+                                        guiRenderSkinOverlay(chaCtrl, dname, dInfo);
+                                        break;
+                                    case CharaDetailDefine.CharaDetailDefineType.CLOTH_OVERLAY:
+                                        guiRenderClothOverlay(chaCtrl, dname, dInfo);
                                         break;
                                     default:
                                         GUILayout.Label(dname + ": UNKNOWN type not implemented");
@@ -431,6 +454,7 @@ namespace StudioCharaEditor
                             }
                             else
                             {
+                                // selecting mode
                                 if (dInfo.DetailDefine.Type == CharaDetailDefine.CharaDetailDefineType.SEPERATOR)
                                 {
                                     continue;
@@ -459,10 +483,9 @@ namespace StudioCharaEditor
                             if (GUILayout.Button(LC("Copy Page")))
                             {
                                 List<string> tgtKeys = new List<string>();
-                                foreach (string dname in dset)
+                                foreach (CharaDetailInfo dInfo in detailInfoSet)
                                 {
-                                    string dkey = curDetailSetKey + "#" + dname;
-                                    tgtKeys.Add(dkey);
+                                    tgtKeys.Add(dInfo.DetailDefine.Key);
                                 }
                                 clipboard = cec.GetDataDictByKeys(tgtKeys.ToArray());
                             }
@@ -470,10 +493,9 @@ namespace StudioCharaEditor
                             {
                                 detailPageSelect = SelectMode.ForCopy;
                                 selectBuffer.Clear();
-                                foreach (string dname in dset)
+                                foreach (CharaDetailInfo dInfo in detailInfoSet)
                                 {
-                                    string dkey = curDetailSetKey + "#" + dname;
-                                    selectBuffer[dkey] = true;
+                                    selectBuffer[dInfo.DetailDefine.Key] = true;
                                 }
                             }
                             if (pageClipboard.Count > 0 && GUILayout.Button(LC("Paste Page")))
@@ -683,7 +705,7 @@ namespace StudioCharaEditor
             Color[] getColors(int size, Color fillColor)
             {
                 List<Color> cList = new List<Color>();
-                for (int i = 0; i < size; i ++)
+                for (int i = 0; i < size; i++)
                 {
                     cList.Add(fillColor);
                 }
@@ -697,7 +719,7 @@ namespace StudioCharaEditor
                     if (dInfo.DetailDefine.Upd != null && !LaterUpdate) dInfo.DetailDefine.Upd(chaCtrl);
                 }
             }
-            
+
             GUILayout.BeginHorizontal();
             GUILayout.Label(LC(name), GUILayout.Width(namew));
             int colorw = 74;
@@ -728,13 +750,19 @@ namespace StudioCharaEditor
             float thumbVSpace = (thumbSize - thumbBtnHeight) / 2;
             float thumbListMinH = thumbSize * 2 + 20;// 130;
             float thumbListMaxH = fullh * 0.7f;// 350;
+            int thumbShowBefore = 1;
+            int thumbShowAfter = (int)(thumbListMaxH / thumbSize) + 1;
+            bool thumbList = name != "Acc Parent" && name != "Acc Category";
+            bool showSmallThumbMode = StudioCharaEditor.ShowSelectedThumb.Value;
+            bool unexpandOnSelect = StudioCharaEditor.CloseListAfterSelect.Value;
+            bool inSearching = false;
 
-            //Console.WriteLine("Render selector of {0}", dInfo.DetailDefine.Key);
+            // Get list and current info
             int oldId = (int)dInfo.DetailDefine.Get(chaCtrl);
             string oldName = "!!Unknown!!";
             int oldIndex = -1;
             List<CustomSelectInfo> infoLst = dInfo.DetailDefine.SelectorList(chaCtrl);
-            for (int i = 0; i < infoLst.Count; i ++)
+            for (int i = 0; i < infoLst.Count; i++)
             {
                 if (infoLst[i].id == oldId)
                 {
@@ -743,14 +771,22 @@ namespace StudioCharaEditor
                     break;
                 }
             }
+
+            // initialize pool
             if (!scrollPool.ContainsKey(name))
             {
                 scrollPool[name] = Vector2.zero;
                 expandPool[name] = false;
+                thumbPool[name] = new Dictionary<string, Texture2D>();
+                searchWordPool[name] = string.Empty;
             }
 
             void onChangeId(int id)
             {
+                if (unexpandOnSelect)
+                {
+                    expandPool[name] = false;   // no matter changed or not
+                }
                 if (id != oldId)
                 {
                     dInfo.DetailDefine.Set(chaCtrl, id);
@@ -758,46 +794,117 @@ namespace StudioCharaEditor
                 }
             }
 
+            Texture2D getThumbTex(CustomSelectInfo info)
+            {
+                if (info.assetBundle != null && info.assetName != null)
+                {
+                    string texKey = info.assetBundle + "+" + info.assetName;
+                    if (!thumbPool[name].ContainsKey(texKey))
+                    {
+                        thumbPool[name][texKey] = CommonLib.LoadAsset<Texture2D>(info.assetBundle, info.assetName, false, ""); ;
+                    }
+                    return thumbPool[name][texKey];
+                }
+                else
+                {
+                    return Texture2D.blackTexture;
+                }
+            }
+
             // title line
             GUILayout.BeginHorizontal();
             GUILayout.Label(LC(name), GUILayout.Width(namew));
-            GUILayout.Label(string.Format("#{0}: {1}", oldId, oldName));
-            GUILayout.FlexibleSpace();
-            if (GUILayout.Button(expandPool[name] ? "-" : "+", GUILayout.Width(25)))
+            if (thumbList && showSmallThumbMode && !expandPool[name])
             {
-                expandPool[name] = !expandPool[name];
-                if (expandPool[name])
+                Texture2D tex = oldIndex >= 0 ? getThumbTex(infoLst[oldIndex]) : Texture2D.blackTexture;
+                GUILayout.Box(tex, GUILayout.Width(thumbSizeSmall), GUILayout.Height(thumbSizeSmall));
+                GUILayout.Label(string.Format("#{0}\n{1}", oldId, oldName));
+                GUILayout.FlexibleSpace();
+                if (GUILayout.Button("+", GUILayout.Width(25)))
+                {
+                    expandPool[name] = true;
                     scrollPool[name] = new Vector2(0, oldIndex * (thumbSize + 4) + 4);
+                }
+                if (dInfo.RevertValue != null && GUILayout.Button("R", GUILayout.Width(25)))
+                    onChangeId((int)dInfo.RevertValue);
             }
-            if (dInfo.RevertValue != null && GUILayout.Button("R", GUILayout.Width(25)))
-                onChangeId((int)dInfo.RevertValue);
+            else
+            {
+                GUILayout.Label(string.Format("#{0}: {1}", oldId, oldName));
+                GUILayout.FlexibleSpace();
+                if (expandPool[name])
+                {
+                    // search button
+                    var oldColor = GUI.color;
+                    if (searchingMode)
+                        GUI.color = Color.yellow;
+                    if (GUILayout.Button(LC("Search")))
+                        searchingMode = !searchingMode;
+                    GUI.color = oldColor;
+                    // - button
+                    if (GUILayout.Button("-", GUILayout.Width(25)))
+                    {
+                        expandPool[name] = false;
+                    }
+                }
+                else
+                {
+                    // + button
+                    if (GUILayout.Button("+", GUILayout.Width(25)))
+                    {
+                        expandPool[name] = true;
+                        if (thumbList)
+                            scrollPool[name] = new Vector2(0, oldIndex * (thumbSize + 3) + 4);
+                        else
+                            scrollPool[name] = new Vector2(0, oldIndex * (20 + 4) + 4);
+                    }
+                }
+                // R button
+                if (dInfo.RevertValue != null && GUILayout.Button("R", GUILayout.Width(25)))
+                    onChangeId((int)dInfo.RevertValue);
+            }
             GUILayout.EndHorizontal();
+
             // expandable list
             if (expandPool[name])
             {
-                // build and backup thumbs if not created yet or should never be backup
-                if (!thumbPool.ContainsKey(name) || name.Equals("FaceSkinType"))
+                // search box
+                if (searchingMode && thumbList)
                 {
-                    List<Texture2D> tlst = new List<Texture2D>();
-                    foreach (CustomSelectInfo info in infoLst)
+                    GUILayout.BeginHorizontal();
+                    GUILayout.Label(" ", GUILayout.Width(namew));
+                    GUILayout.Label(LC("Search"), GUILayout.Width(namew));
+                    searchWordPool[name] = GUILayout.TextField(searchWordPool[name]);
+                    if (GUILayout.Button("X", GUILayout.Width(25)))
                     {
-                        Texture2D tex = CommonLib.LoadAsset<Texture2D>(info.assetBundle, info.assetName, false, "");
-                        tlst.Add(tex);
+                        searchWordPool[name] = string.Empty;
                     }
-                    thumbPool[name] = tlst.ToArray();
+                    GUILayout.EndHorizontal();
+                    inSearching = !string.IsNullOrWhiteSpace(searchWordPool[name]);
                 }
 
                 // draw drop list
                 GUILayout.BeginHorizontal();
                 GUILayout.Label(" ", GUILayout.Width(namew));
                 scrollPool[name] = GUILayout.BeginScrollView(scrollPool[name], GUI.skin.box, GUILayout.MinHeight(thumbListMinH), GUILayout.MaxHeight(thumbListMaxH));
-                for (int i = 0; i < infoLst.Count; i ++)
+                int fi = 0;
+                for (int i = 0; i < infoLst.Count; i++)
                 {
                     CustomSelectInfo info = infoLst[i];
                     Color color = GUI.color;
-                    Texture2D tex = thumbPool[name][i];
-                    if (tex != null)
+                    if (thumbList)
                     {
+                        // search filter
+                        if (inSearching && !info.name.ToLower().Contains(searchWordPool[name].ToLower()))
+                        {
+                            continue;
+                        }
+                        // load thumb tex
+                        int curDispIndex = (int)(scrollPool[name].y / (thumbSize + 4));
+                        bool needThumb = fi >= curDispIndex - thumbShowBefore && fi <= curDispIndex + thumbShowAfter;
+                        fi++;
+                        Texture2D tex = needThumb ? getThumbTex(info) : Texture2D.blackTexture;
+                        // show thumb and button
                         GUILayout.BeginHorizontal();
                         GUILayout.Box(tex, GUILayout.Width(thumbSize), GUILayout.Height(thumbSize));
                         GUILayout.BeginVertical();
@@ -811,6 +918,7 @@ namespace StudioCharaEditor
                     }
                     else
                     {
+                        // button only
                         if (info.id == oldId)
                             GUI.color = Color.green;
                         if (GUILayout.Button(string.Format("#{0}: {1}", info.id, info.name)))
@@ -866,6 +974,127 @@ namespace StudioCharaEditor
                 dInfo.DetailDefine.Set(chaCtrl, newV);
                 if (dInfo.DetailDefine.Upd != null && !LaterUpdate) dInfo.DetailDefine.Upd(chaCtrl);
             }
+            GUILayout.EndHorizontal();
+        }
+
+        private void guiRenderValueInput(ChaControl chaCtrl, string name, CharaDetailInfo dInfo)
+        {
+            float oldV = (float)dInfo.DetailDefine.Get(chaCtrl);
+            float newV = oldV;
+            bool preciseMode = StudioCharaEditor.PreciseInputMode.Value;
+            CharaValueDetailDefine vDefine = (CharaValueDetailDefine)dInfo.DetailDefine;
+            float dim1 = preciseMode ? vDefine.DimStep1 / 10 : vDefine.DimStep1;
+            float dim2 = preciseMode ? vDefine.DimStep2 / 10 : vDefine.DimStep2;
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label(LC(name), GUILayout.Width(namew));
+            // dec buttons
+            if (GUILayout.RepeatButton("<<", GUILayout.Width(30)))
+                newV -= dim2;
+            if (GUILayout.RepeatButton("<", GUILayout.Width(25)))
+                newV -= dim1;
+            // value input
+            string txtV;
+            int inputw;
+            if (preciseMode)
+            {
+                txtV = string.Format("{0:F5}", oldV);
+                inputw = 70;
+            }
+            else
+            {
+                txtV = string.Format("{0:F3}", oldV);
+                inputw = 60;
+            }
+            string newTxtV = GUILayout.TextField(txtV, GUILayout.Width(inputw));
+            if (!newTxtV.Equals(txtV))
+            {
+                if (float.TryParse(newTxtV, out float outV))
+                {
+                    newV = outV;
+                }
+            }
+            // inc buttons
+            if (GUILayout.RepeatButton(">", GUILayout.Width(25)))
+                newV += dim1;
+            if (GUILayout.RepeatButton(">>", GUILayout.Width(30)))
+                newV += dim2;
+            // def button
+            if (!float.IsNaN(vDefine.DefValue) && GUILayout.Button(vDefine.DefValue.ToString()))
+                newV = vDefine.DefValue;
+            // revert
+            GUILayout.FlexibleSpace();
+            if (dInfo.RevertValue != null && GUILayout.Button("R", GUILayout.Width(25)))
+                newV = (float)dInfo.RevertValue;
+            GUILayout.EndHorizontal();
+
+            if (newV != oldV)
+            {
+                if (vDefine.LoopValue && !float.IsNaN(vDefine.MinValue) && !float.IsNaN(vDefine.MaxValue))
+                {
+                    while (newV < vDefine.MinValue)
+                        newV = vDefine.MaxValue - (vDefine.MinValue - newV);
+                    while (newV > vDefine.MaxValue)
+                        newV = vDefine.MinValue + (newV - vDefine.MaxValue);
+                }
+                else
+                {
+                    if (!float.IsNaN(vDefine.MinValue) && newV < vDefine.MinValue)
+                        newV = vDefine.MinValue;
+                    if (!float.IsNaN(vDefine.MaxValue) && newV > vDefine.MaxValue)
+                        newV = vDefine.MaxValue;
+                }
+                dInfo.DetailDefine.Set(chaCtrl, newV);
+                if (dInfo.DetailDefine.Upd != null && !LaterUpdate) dInfo.DetailDefine.Upd(chaCtrl);
+            }
+        }
+
+        private void guiRenderIntStatus(ChaControl chaCtrl, string name, CharaDetailInfo dInfo)
+        {
+            int oldV = Convert.ToInt32(dInfo.DetailDefine.Get(chaCtrl));
+            int newV = oldV;
+            int btnWidth = 50;
+            CharaIntStatusDetailDefine vDefine = (CharaIntStatusDetailDefine)dInfo.DetailDefine;
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label(LC(name), GUILayout.Width(namew));
+            // int selector
+            int num = vDefine.IntStatus.Length;
+            if (true)
+            {
+                // select buttons
+                for (int i = 0; i < num; i++)
+                {
+                    Color oldColor = GUI.color;
+                    if (oldV == vDefine.IntStatus[i])
+                        GUI.color = Color.green;
+                    if (GUILayout.Button(LC(vDefine.IntStatusName[i]), GUILayout.Width(btnWidth)))
+                        newV = vDefine.IntStatus[i];
+                    GUI.color = oldColor;
+                }
+            }
+            // revert
+            GUILayout.FlexibleSpace();
+            if (dInfo.RevertValue != null && GUILayout.Button("R", GUILayout.Width(25)))
+                newV = Convert.ToInt32(dInfo.RevertValue);
+            GUILayout.EndHorizontal();
+
+            // update
+            if (newV != oldV)
+            {
+                dInfo.DetailDefine.Set(chaCtrl, newV);
+                if (dInfo.DetailDefine.Upd != null && !LaterUpdate) dInfo.DetailDefine.Upd(chaCtrl);
+            }
+        }
+
+        private void guiRenderButton(ChaControl chaCtrl, string name, CharaDetailInfo dInfo)
+        {
+            GUILayout.BeginHorizontal();
+            GUILayout.Label(" ", GUILayout.Width(namew));
+            // a button
+            if (GUILayout.Button(LC(name)) && dInfo.DetailDefine.Upd != null)
+                dInfo.DetailDefine.Upd(chaCtrl);
+            GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
         }
 
@@ -949,14 +1178,14 @@ namespace StudioCharaEditor
                 CharaABMXDetailDefine2 dd2 = (dInfo.DetailDefine as CharaABMXDetailDefine2);
                 GUILayout.BeginHorizontal();
                 GUILayout.Label(LC("Side to edit"), GUILayout.Width(namew));
-                for (int i = 0; i < dd2.targetNames.Length; i ++)
+                for (int i = 0; i < dd2.targetNames.Length; i++)
                 {
                     Color bkc = GUI.color;
                     if (i == dd2.curTargetIndex)
                     {
                         GUI.color = Color.green;
                     }
-                    if (GUILayout.Button(LC(dd2.targetNames[i]))) 
+                    if (GUILayout.Button(LC(dd2.targetNames[i])))
                     {
                         dd2.curTargetIndex = i;
                     }
@@ -988,7 +1217,7 @@ namespace StudioCharaEditor
                 GUILayout.EndHorizontal();
                 GUILayout.BeginHorizontal();
                 GUILayout.Label(LC("Finger"), GUILayout.Width(namew));
-                for (int i = 0; i < dd3.fingerNames.Length; i ++)
+                for (int i = 0; i < dd3.fingerNames.Length; i++)
                 {
                     Color bkc = GUI.color;
                     if (i == dd3.curFingerIndex)
@@ -1027,7 +1256,7 @@ namespace StudioCharaEditor
                 throw new ArgumentException("Unexpected DetailDefine.Type for ABMX bone: " + name);
             }
             // sliders
-            for (int i = 0; i < workSet.Length; i ++)
+            for (int i = 0; i < workSet.Length; i++)
             {
                 float sldMax = 2;
                 float sldMin = 0;
@@ -1121,7 +1350,7 @@ namespace StudioCharaEditor
                         }
                         if (dd3.curFingerIndex == 0)
                         {
-                            for (int h = 0; h < 2; h ++)
+                            for (int h = 0; h < 2; h++)
                             {
                                 if (dd3.curTargetIndex == 0 || dd3.curTargetIndex - 1 == h)
                                 {
@@ -1140,12 +1369,84 @@ namespace StudioCharaEditor
 
         }
 
+        private void guiRenderSkinOverlay(ChaControl chaCtrl, string name, CharaDetailInfo dInfo)
+        {
+            GUIStyle texTextStyle = new GUIStyle("box");
+            texTextStyle.alignment = TextAnchor.MiddleCenter;
+
+            // current part texture
+            SkinOverlayDetailDefine overlayDefine = (SkinOverlayDetailDefine)dInfo.DetailDefine;
+            Texture2D tex = (Texture2D)overlayDefine.GetSkinOverlayTex(chaCtrl);
+
+            // Overlay block
+            GUILayout.BeginHorizontal();
+            GUILayout.Label(LC(name), GUILayout.Width(namew));
+            if (tex != null)
+                GUILayout.Box(tex, GUILayout.Width(thumbSize), GUILayout.Height(thumbSize));
+            else
+                GUILayout.Box(LC("No Texture"), texTextStyle, GUILayout.Width(thumbSize), GUILayout.Height(thumbSize));
+            GUILayout.BeginVertical();
+            if (GUILayout.Button(LC("Load new texture")))
+                overlayDefine.LoadNewOverlayTexture(chaCtrl);
+            if (tex != null && GUILayout.Button(LC("Clear texture")))
+                overlayDefine.SetSkinOverlayTex(chaCtrl, null);
+            if (tex != null && GUILayout.Button(LC("Export current texture")))
+                overlayDefine.DumpSkinOverlayTexture(chaCtrl);
+            if (!CharaEditorController.DataValueEqual(tex, dInfo.RevertValue) && GUILayout.Button(LC("Revert")))
+                overlayDefine.SetSkinOverlayTex(chaCtrl, dInfo.RevertValue);
+            GUILayout.EndVertical();
+            GUILayout.EndHorizontal();
+        }
+
+        private void guiRenderClothOverlay(ChaControl chaCtrl, string name, CharaDetailInfo dInfo)
+        {
+            GUIStyle texTextStyle = new GUIStyle("box");
+            texTextStyle.alignment = TextAnchor.MiddleCenter;
+
+            // current part texture
+            ClothOverlayDetailDefine overlayDefine = (ClothOverlayDetailDefine)dInfo.DetailDefine;
+            KoiClothesOverlayX.ClothesTexData texData = (KoiClothesOverlayX.ClothesTexData)overlayDefine.GetClothOverlayTexData(chaCtrl);
+
+            // Overlay block
+            GUILayout.BeginHorizontal();
+            GUILayout.Label(LC(name), GUILayout.Width(namew));
+            if (texData != null && texData.Texture != null)
+                GUILayout.Box(texData.Texture, GUILayout.Width(thumbSize), GUILayout.Height(thumbSize));
+            else
+                GUILayout.Box(LC("No Texture"), texTextStyle, GUILayout.Width(thumbSize), GUILayout.Height(thumbSize));
+            GUILayout.BeginVertical();
+            if (GUILayout.Button(LC("Load new overlay texture")))
+                overlayDefine.LoadNewOverlayTexture(chaCtrl);
+            if (texData != null && GUILayout.Button(LC("Clear overlay texture")))
+                overlayDefine.SetClothOverlayTex(chaCtrl, null);
+            if (texData != null && GUILayout.Button(LC("Export overlay texture")))
+                overlayDefine.DumpClothOverlayTexture(chaCtrl);
+            if (GUILayout.Button(LC("Dump original texture")))
+                overlayDefine.DumpClothOrignalTexture(chaCtrl);
+            if (texData != null)
+            {
+                bool newOverride = GUILayout.Toggle(texData.Override, LC("Hide base textrue"));
+                if (newOverride != texData.Override) {
+                    texData.Override = newOverride;
+                    overlayDefine.RefreshClothesTexture(chaCtrl);
+                }
+            }
+            if (overlayDefine.modified && GUILayout.Button(LC("Revert")))
+            {
+                overlayDefine.SetClothOverlayTex(chaCtrl, dInfo.RevertValue);
+                overlayDefine.modified = false;
+            }
+            GUILayout.EndVertical();
+            GUILayout.EndHorizontal();
+        }
+
         private void guiSave()
         {
             float fullw = windowRect.width - 20;
             float fullh = windowRect.height - 20;
+
             float thumbH = fullh - 40;
-            float thumbW = thumbH * 252.0f / 352.0f;
+            float thumbW = fullw - 350;// thumbH * 252.0f / 352.0f;
             ChaFile savingChaFile = savingChara.charInfo.chaFile;
 
             // save ui

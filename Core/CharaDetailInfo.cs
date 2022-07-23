@@ -28,24 +28,31 @@ namespace StudioCharaEditor
     {
         public enum CharaDetailDefineType
         {
+            // non-data
             UNKNOWN,
+            SEPERATOR,
+            BUTTON,
+            // continuous
             SLIDER,
             COLOR,
-            SELECTOR,
             HAIR_BUNDLE,
-
-            SEPERATOR,
-            TOGGLE,
-
+            VALUEINPUT,
             ABMXSET1,
             ABMXSET2,
             ABMXSET3,
+            // discrete
+            SELECTOR,
+            TOGGLE,
+            INT_STATUS,
+            SKIN_OVERLAY,
+            CLOTH_OVERLAY,
         };
         public enum CharaDetailDefineCatelog
         {
             VANILLA,
             ABMX,
             BOOBSETTING,
+            OVERLAY,
         };
         public delegate object GetFunc(ChaControl chaCtrl);
         public delegate void SetFunc(ChaControl chaCtrl, object value);
@@ -61,6 +68,69 @@ namespace StudioCharaEditor
         public SetFunc Set;
         public UpdFunc Upd;
         public LstFunc SelectorList;
+
+        // helper
+        public virtual bool IsData
+        {
+            get
+            {
+                return Type != CharaDetailDefineType.UNKNOWN &&
+                       Type != CharaDetailDefineType.SEPERATOR &&
+                       Type != CharaDetailDefineType.BUTTON;
+            }
+        }
+
+        public virtual bool IsContinuousData
+        {
+            get
+            {
+                return Type == CharaDetailDefineType.SLIDER ||
+                       Type == CharaDetailDefineType.COLOR ||
+                       Type == CharaDetailDefineType.HAIR_BUNDLE ||
+                       Type == CharaDetailDefineType.VALUEINPUT ||
+                       Type == CharaDetailDefineType.ABMXSET1 ||
+                       Type == CharaDetailDefineType.ABMXSET2 ||
+                       Type == CharaDetailDefineType.ABMXSET3;
+            }
+        }
+
+        public virtual bool IsDiscreteData
+        {
+            get
+            {
+                return Type == CharaDetailDefineType.SELECTOR ||
+                       Type == CharaDetailDefineType.TOGGLE ||
+                       Type == CharaDetailDefineType.INT_STATUS ||
+                       Type == CharaDetailDefineType.SKIN_OVERLAY ||
+                       Type == CharaDetailDefineType.CLOTH_OVERLAY;
+            }
+        }
+    }
+
+    class CharaValueDetailDefine : CharaDetailDefine
+    {
+        public float MinValue = float.NaN;
+        public float MaxValue = float.NaN;
+        public float DefValue = float.NaN;
+        public bool LoopValue = false;
+        public float DimStep1 = 0.1f;
+        public float DimStep2 = 1;
+
+        public CharaValueDetailDefine()
+        {
+            base.Type = CharaDetailDefineType.VALUEINPUT;
+        }
+    }
+
+    class CharaIntStatusDetailDefine : CharaDetailDefine
+    {
+        public int[] IntStatus = new int[] { };
+        public string[] IntStatusName = new string[] { };
+
+        public CharaIntStatusDetailDefine()
+        {
+            base.Type = CharaDetailDefineType.INT_STATUS;
+        }
     }
 
     class CharaDetailSet
@@ -197,6 +267,12 @@ namespace StudioCharaEditor
         {
             CharaEditorController cec = CharaEditorMgr.Instance.GetEditorController(chaCtrl);
             cec.SetPushUpBreastSoftness(value);
+        }
+        
+        public static void updateClothType(ChaControl chaCtrl, int id, int clothIndex)
+        {
+            chaCtrl.chaFile.coordinate.clothes.parts[clothIndex].id = id;
+            chaCtrl.ChangeClothes(clothIndex, id, false);
         }
         #endregion
 
@@ -2437,19 +2513,1019 @@ namespace StudioCharaEditor
             #endregion
         };
 
-        public static string[][] ExcludeKeys =
+        public static CharaDetailDefine[] ClothDetailBuilder(ChaControl charInfo, int index)
         {
-            // male
-            new string[]
+            ChaListDefine.CategoryNo[] MALE_CLOTH_CATEGORYNO = new ChaListDefine.CategoryNo[] {
+                ChaListDefine.CategoryNo.mo_top,
+                ChaListDefine.CategoryNo.mo_bot,
+                ChaListDefine.CategoryNo.mo_gloves,
+                ChaListDefine.CategoryNo.mo_shoes
+            };
+            ChaListDefine.CategoryNo[] FEMALE_CLOTH_CATEGORYNO = new ChaListDefine.CategoryNo[] {
+                ChaListDefine.CategoryNo.fo_top, 
+                ChaListDefine.CategoryNo.fo_bot, 
+                ChaListDefine.CategoryNo.fo_inner_t, 
+                ChaListDefine.CategoryNo.fo_inner_b, 
+                ChaListDefine.CategoryNo.fo_gloves, 
+                ChaListDefine.CategoryNo.fo_panst, 
+                ChaListDefine.CategoryNo.fo_socks, 
+                ChaListDefine.CategoryNo.fo_shoes
+            };
+            List<CharaDetailDefine> clothDetails = new List<CharaDetailDefine>();
+            string clothName = charInfo.sex == 1 ? CharaEditorController.FEMALE_CLOTHES_NAME[index] : CharaEditorController.MALE_CLOTHES_NAME[index];
+            ChaListDefine.CategoryNo typeCategoryNo = charInfo.sex == 1 ? FEMALE_CLOTH_CATEGORYNO[index] : MALE_CLOTH_CATEGORYNO[index];
+            CmpClothes cmpCloth = charInfo.cmpClothes[index];
+            CharaEditorController cec = CharaEditorMgr.Instance.GetEditorController(charInfo);
+            int[] threeStatusCloth = new int[] { 0, 1, 2 };
+            int[] twoStatusCloth = new int[] { 0, 2 };
+            string[] threeStatusClothStatusName = { "ON", "Half", "OFF" };
+            string[] twoStatusClothStatusName = { "ON", "OFF" };
+            bool isThreeStatus = charInfo.sex == 1 && (index != 4 && index != 6 && index != 7);
+
+            // function to build details for color
+            CharaDetailDefine[] clothColorInfoDetailBuilder(int clothIndex, int colorIndex)
             {
-            },
-            // female
-            new string[]
-            {
-                "Face#Bread#BreadType",
-                "Face#Bread#BreadColor",
+                void updateClothPatternLayout(ChaControl chaCtrl, int clothIndexL, int colorIndexL, string axis, float newValue)
+                {
+                    Vector4 oldLayout = chaCtrl.nowCoordinate.clothes.parts[clothIndex].colorInfo[colorIndex].layout;
+                    Vector4 newLayout;
+                    if (axis == "x")
+                        newLayout = new Vector4(newValue, oldLayout.y, oldLayout.z, oldLayout.w);
+                    else if (axis == "y")
+                        newLayout = new Vector4(oldLayout.x, newValue, oldLayout.z, oldLayout.w);
+                    else if (axis == "z")
+                        newLayout = new Vector4(oldLayout.x, oldLayout.y, newValue, oldLayout.w);
+                    else if (axis == "w")
+                        newLayout = new Vector4(oldLayout.x, oldLayout.y, oldLayout.z, newValue);
+                    else
+                        throw new Exception();
+                    chaCtrl.nowCoordinate.clothes.parts[clothIndex].colorInfo[colorIndex].layout = newLayout;
+                    chaCtrl.chaFile.coordinate.clothes.parts[clothIndex].colorInfo[colorIndex].layout = newLayout;
+                    chaCtrl.ChangeCustomClothes(clothIndex, true, false, false, false);
+                }
+
+                string colorNo = " " + (colorIndex + 1).ToString();
+                List<CharaDetailDefine> colorInfo = new List<CharaDetailDefine>();
+
+                // color title seperator
+                colorInfo.Add(new CharaDetailDefine
+                {
+                    Key = "Clothes#" + clothName + "#Color" + colorNo + " Setting",
+                    Type = CharaDetailDefine.CharaDetailDefineType.SEPERATOR,
+                });
+
+                // color
+                CharaDetailDefine color = new CharaDetailDefine
+                {
+                    Key = "Clothes#" + clothName + "#Color" + colorNo,
+                    Type = CharaDetailDefine.CharaDetailDefineType.COLOR,
+                    Get = (chaCtrl) => { return chaCtrl.nowCoordinate.clothes.parts[clothIndex].colorInfo[colorIndex].baseColor; },
+                    Set = (chaCtrl, v) => {
+                        chaCtrl.nowCoordinate.clothes.parts[clothIndex].colorInfo[colorIndex].baseColor = (Color)v;
+                        chaCtrl.chaFile.coordinate.clothes.parts[clothIndex].colorInfo[colorIndex].baseColor = (Color)v;
+                        chaCtrl.ChangeCustomClothes(clothIndex, true, false, false, false);
+                    },
+                };
+                colorInfo.Add(color);
+
+                // gloss
+                CharaDetailDefine gloss = new CharaDetailDefine
+                {
+                    Key = "Clothes#" + clothName + "#Gloss" + colorNo,
+                    Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                    Get = (chaCtrl) => { return chaCtrl.nowCoordinate.clothes.parts[clothIndex].colorInfo[colorIndex].glossPower; },
+                    Set = (chaCtrl, v) =>
+                    {
+                        chaCtrl.nowCoordinate.clothes.parts[clothIndex].colorInfo[colorIndex].glossPower = (float)v;
+                        chaCtrl.chaFile.coordinate.clothes.parts[clothIndex].colorInfo[colorIndex].glossPower = (float)v;
+                        chaCtrl.ChangeCustomClothes(clothIndex, true, false, false, false);
+                    },
+                };
+                colorInfo.Add(gloss);
+
+                // metallic
+                CharaDetailDefine metallic = new CharaDetailDefine
+                {
+                    Key = "Clothes#" + clothName + "#Metallic" + colorNo,
+                    Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                    Get = (chaCtrl) => { return chaCtrl.nowCoordinate.clothes.parts[clothIndex].colorInfo[colorIndex].metallicPower; },
+                    Set = (chaCtrl, v) =>
+                    {
+                        chaCtrl.nowCoordinate.clothes.parts[clothIndex].colorInfo[colorIndex].metallicPower = (float)v;
+                        chaCtrl.chaFile.coordinate.clothes.parts[clothIndex].colorInfo[colorIndex].metallicPower = (float)v;
+                        chaCtrl.ChangeCustomClothes(clothIndex, true, false, false, false);
+                    },
+                };
+                colorInfo.Add(metallic);
+
+                // pattern
+                CharaDetailDefine pattern = new CharaDetailDefine
+                {
+                    Key = "Clothes#" + clothName + "#Pattern" + colorNo,
+                    Type = CharaDetailDefine.CharaDetailDefineType.SELECTOR,
+                    Get = (chaCtrl) => { return chaCtrl.nowCoordinate.clothes.parts[clothIndex].colorInfo[colorIndex].pattern; },
+                    Set = (chaCtrl, v) =>
+                    {
+                        chaCtrl.nowCoordinate.clothes.parts[clothIndex].colorInfo[colorIndex].pattern = (int)v;
+                        chaCtrl.chaFile.coordinate.clothes.parts[clothIndex].colorInfo[colorIndex].pattern = (int)v;
+                        chaCtrl.ChangeCustomClothes(clothIndex, false, colorIndex == 0, colorIndex == 1, colorIndex == 2);
+                        // update cloth type
+                        cec.UpdateDetailInfo_ClothType(clothName);
+                    },
+                    SelectorList = (chaCtrl) => { return CvsBase.CreateSelectList(ChaListDefine.CategoryNo.st_pattern); },
+                };
+                colorInfo.Add(pattern);
+
+                // pattern detail
+                if (charInfo.nowCoordinate.clothes.parts[clothIndex].colorInfo[colorIndex].pattern != 0)
+                {
+                    // pattern color
+                    CharaDetailDefine patternColor = new CharaDetailDefine
+                    {
+                        Key = "Clothes#" + clothName + "#Pattern" + colorNo + " Color",
+                        Type = CharaDetailDefine.CharaDetailDefineType.COLOR,
+                        Get = (chaCtrl) => { return chaCtrl.nowCoordinate.clothes.parts[clothIndex].colorInfo[colorIndex].patternColor; },
+                        Set = (chaCtrl, v) => {
+                            chaCtrl.nowCoordinate.clothes.parts[clothIndex].colorInfo[colorIndex].patternColor = (Color)v;
+                            chaCtrl.chaFile.coordinate.clothes.parts[clothIndex].colorInfo[colorIndex].patternColor = (Color)v;
+                            chaCtrl.ChangeCustomClothes(clothIndex, true, false, false, false);
+                        },
+                    };
+                    colorInfo.Add(patternColor);
+
+                    // pattern width
+                    CharaDetailDefine patternWidth = new CharaDetailDefine
+                    {
+                        Key = "Clothes#" + clothName + "#Pattern" + colorNo + " Width",
+                        Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                        Get = (chaCtrl) => { return chaCtrl.nowCoordinate.clothes.parts[clothIndex].colorInfo[colorIndex].layout.x; },
+                        Set = (chaCtrl, v) => { updateClothPatternLayout(chaCtrl, clothIndex, colorIndex, "x", (float)v); },
+                    };
+                    colorInfo.Add(patternWidth);
+
+                    // pattern height
+                    CharaDetailDefine patternHeight = new CharaDetailDefine
+                    {
+                        Key = "Clothes#" + clothName + "#Pattern" + colorNo + " Height",
+                        Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                        Get = (chaCtrl) => { return chaCtrl.nowCoordinate.clothes.parts[clothIndex].colorInfo[colorIndex].layout.y; },
+                        Set = (chaCtrl, v) => { updateClothPatternLayout(chaCtrl, clothIndex, colorIndex, "y", (float)v); },
+                    };
+                    colorInfo.Add(patternHeight);
+
+                    // pattern X
+                    CharaDetailDefine patternX = new CharaDetailDefine
+                    {
+                        Key = "Clothes#" + clothName + "#Pattern" + colorNo + " X",
+                        Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                        Get = (chaCtrl) => { return chaCtrl.nowCoordinate.clothes.parts[clothIndex].colorInfo[colorIndex].layout.z; },
+                        Set = (chaCtrl, v) => { updateClothPatternLayout(chaCtrl, clothIndex, colorIndex, "z", (float)v); },
+                    };
+                    colorInfo.Add(patternX);
+
+                    // pattern Y
+                    CharaDetailDefine patternY = new CharaDetailDefine
+                    {
+                        Key = "Clothes#" + clothName + "#Pattern" + colorNo + " Y",
+                        Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                        Get = (chaCtrl) => { return chaCtrl.nowCoordinate.clothes.parts[clothIndex].colorInfo[colorIndex].layout.w; },
+                        Set = (chaCtrl, v) => { updateClothPatternLayout(chaCtrl, clothIndex, colorIndex, "w", (float)v); },
+                    };
+                    colorInfo.Add(patternY);
+
+                    // pattern rotate
+                    CharaDetailDefine patternRotate = new CharaDetailDefine
+                    {
+                        Key = "Clothes#" + clothName + "#Pattern" + colorNo + " Rotate",
+                        Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                        Get = (chaCtrl) => { return chaCtrl.nowCoordinate.clothes.parts[clothIndex].colorInfo[colorIndex].rotation; },
+                        Set = (chaCtrl, v) =>
+                        {
+                            chaCtrl.nowCoordinate.clothes.parts[clothIndex].colorInfo[colorIndex].rotation = (float)v;
+                            chaCtrl.chaFile.coordinate.clothes.parts[clothIndex].colorInfo[colorIndex].rotation = (float)v;
+                            chaCtrl.ChangeCustomClothes(clothIndex, true, false, false, false);
+                        },
+                    };
+                    colorInfo.Add(patternRotate);
+                }
+
+                // restore color
+                colorInfo.Add(new CharaDetailDefine
+                {
+                    Key = CharaEditorController.CT1_CTHS + "#" + clothName + "#Restore color" + colorNo + " setting",
+                    Type = CharaDetailDefine.CharaDetailDefineType.BUTTON,
+                    Upd = (chaCtrl) => { cec.RestoreClothDefaultColor(clothName, clothIndex, colorIndex); },
+                });
+
+                return colorInfo.ToArray();
             }
-        };
+
+            // type
+            CharaDetailDefine clothType = new CharaDetailDefine
+            {
+                Key = "Clothes#" + clothName + "#" + clothName + " Type",
+                Type = CharaDetailDefine.CharaDetailDefineType.SELECTOR,
+                Get = (chaCtrl) => { return chaCtrl.nowCoordinate.clothes.parts[index].id; },
+                Set = (chaCtrl, v) =>
+                {
+                    chaCtrl.chaFile.coordinate.clothes.parts[index].id = (int)v;
+                    chaCtrl.ChangeClothes(index, (int)v, false);
+                    // update cloth type
+                    cec.UpdateDetailInfo_ClothType(clothName);
+                },
+                SelectorList = (chaCtrl) => { return CvsBase.CreateSelectList(typeCategoryNo); },
+            };
+            clothDetails.Add(clothType);
+
+            // other setting if valid
+            if (cmpCloth != null)
+            {
+                // status
+                clothDetails.Add(new CharaIntStatusDetailDefine
+                {
+                    Key = "Clothes#" + clothName + "#Cloth Status",
+                    Get = (chaCtrl) => { return chaCtrl.fileStatus.clothesState[index]; },
+                    Set = (chaCtrl, v) => { chaCtrl.SetClothesState(index, Convert.ToByte(v), true); },
+                    IntStatus = isThreeStatus ? threeStatusCloth : twoStatusCloth,
+                    IntStatusName = isThreeStatus ? threeStatusClothStatusName : twoStatusClothStatusName,
+                });
+
+                // restore color
+                clothDetails.Add(new CharaDetailDefine
+                {
+                    Key = CharaEditorController.CT1_CTHS + "#" + clothName + "#Restore all color setting",
+                    Type = CharaDetailDefine.CharaDetailDefineType.BUTTON,
+                    Upd = (chaCtrl) => { cec.RestoreClothDefaultColor(clothName, index, -1); },
+                });
+
+                // color 1
+                if (cmpCloth.useColorA01 || cmpCloth.useColorN01)
+                {
+                    clothDetails.AddRange(clothColorInfoDetailBuilder(index, 0));
+                }
+
+                // color 2
+                if (cmpCloth.useColorA02 || cmpCloth.useColorN02)
+                {
+                    clothDetails.AddRange(clothColorInfoDetailBuilder(index, 1));
+                }
+
+                // color 3
+                if (cmpCloth.useColorA03 || cmpCloth.useColorN03)
+                {
+                    clothDetails.AddRange(clothColorInfoDetailBuilder(index, 2));
+                }
+
+                // options title seperator
+                bool hasOptionParts1 = cmpCloth.objOpt01 != null && cmpCloth.objOpt01.Length > 0;
+                bool hasOptionParts2 = cmpCloth.objOpt02 != null && cmpCloth.objOpt02.Length > 0;
+                if (cmpCloth.useBreak || hasOptionParts1 || hasOptionParts2)
+                {
+                    clothDetails.Add(new CharaDetailDefine
+                    {
+                        Key = "Clothes#" + clothName + "#Cloth Options",
+                        Type = CharaDetailDefine.CharaDetailDefineType.SEPERATOR,
+                    });
+                }
+
+                // break
+                if (cmpCloth.useBreak)
+                {
+                    CharaDetailDefine breakRate = new CharaDetailDefine
+                    {
+                        Key = "Clothes#" + clothName + "#Break Rate",
+                        Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                        Get = (chaCtrl) => { return chaCtrl.nowCoordinate.clothes.parts[index].breakRate; },
+                        Set = (chaCtrl, v) =>
+                        {
+                            chaCtrl.nowCoordinate.clothes.parts[index].breakRate = (float)v;
+                            chaCtrl.chaFile.coordinate.clothes.parts[index].breakRate = (float)v;
+                            chaCtrl.ChangeBreakClothes(index);
+                        },
+                    };
+                    clothDetails.Add(breakRate);
+                }
+
+                // Option 1
+                if (hasOptionParts1) {
+                    CharaDetailDefine option1 = new CharaDetailDefine
+                    {
+                        Key = "Clothes#" + clothName + "#Option Parts 1",
+                        Type = CharaDetailDefine.CharaDetailDefineType.TOGGLE,
+                        Get = (chaCtrl) => { return !chaCtrl.nowCoordinate.clothes.parts[index].hideOpt[0]; },
+                        Set = (chaCtrl, v) =>
+                        {
+                            chaCtrl.nowCoordinate.clothes.parts[index].hideOpt[0] = !(bool)v;
+                            chaCtrl.chaFile.coordinate.clothes.parts[index].hideOpt[0] = !(bool)v;
+                        },
+                    };
+                    clothDetails.Add(option1);
+                }
+
+                // Option 2
+                if (hasOptionParts2)
+                {
+                    CharaDetailDefine option2 = new CharaDetailDefine
+                    {
+                        Key = "Clothes#" + clothName + "#Option Parts 2",
+                        Type = CharaDetailDefine.CharaDetailDefineType.TOGGLE,
+                        Get = (chaCtrl) => { return !chaCtrl.nowCoordinate.clothes.parts[index].hideOpt[1]; },
+                        Set = (chaCtrl, v) =>
+                        {
+                            chaCtrl.nowCoordinate.clothes.parts[index].hideOpt[1] = !(bool)v;
+                            chaCtrl.chaFile.coordinate.clothes.parts[index].hideOpt[1] = !(bool)v;
+                        },
+                    };
+                    clothDetails.Add(option2);
+                }
+
+                // Overlay
+                if (cec.HasOverlayPlugin)
+                {
+                    clothDetails.AddRange(PluginOverlayDetailSet.BuildClothOverlayDefine(clothName, index));
+                }
+            }
+
+            // Done
+            return clothDetails.ToArray();
+        }
+    
+        public static string[] ClothUpdateSequenceKeyBuilder(ChaControl charInfo, int index)
+        {
+            string clothName = charInfo.sex == 1 ? CharaEditorController.FEMALE_CLOTHES_NAME[index] : CharaEditorController.MALE_CLOTHES_NAME[index];
+            List<string> keyList = new List<string>();
+
+            string[] clothColorUpdateSequenceKeyBuilder(int colorIndex)
+            {
+                string colorNo = " " + (colorIndex + 1).ToString();
+
+                return new string[]
+                {
+                    "Clothes#" + clothName + "#Color" + colorNo,
+                    "Clothes#" + clothName + "#Gloss" + colorNo,
+                    "Clothes#" + clothName + "#Metallic" + colorNo,
+                    "Clothes#" + clothName + "#Pattern" + colorNo,
+                    "Clothes#" + clothName + "#Pattern" + colorNo + " Color",
+                    "Clothes#" + clothName + "#Pattern" + colorNo + " Width",
+                    "Clothes#" + clothName + "#Pattern" + colorNo + " Height",
+                    "Clothes#" + clothName + "#Pattern" + colorNo + " X",
+                    "Clothes#" + clothName + "#Pattern" + colorNo + " Y",
+                    "Clothes#" + clothName + "#Pattern" + colorNo + " Rotate",
+                };
+            }
+
+            keyList.Add("Clothes#" + clothName + "#" + clothName + " Type");
+            keyList.Add("Clothes#" + clothName + "#Cloth Status");
+            keyList.AddRange(clothColorUpdateSequenceKeyBuilder(0));
+            keyList.AddRange(clothColorUpdateSequenceKeyBuilder(1));
+            keyList.AddRange(clothColorUpdateSequenceKeyBuilder(2));
+            keyList.Add("Clothes#" + clothName + "#Break Rate");
+            keyList.Add("Clothes#" + clothName + "#Option Parts 1");
+            keyList.Add("Clothes#" + clothName + "#Option Parts 2");
+
+            return keyList.ToArray();
+        }
+    
+        public static CharaDetailDefine[] AccessoryDetailBuilder(ChaControl charInfo, string accKey)
+        {
+            List<CharaDetailDefine> accDetails = new List<CharaDetailDefine>();
+            CharaEditorController cec = CharaEditorMgr.Instance.GetEditorController(charInfo);
+            AccessoryInfo accInfo = cec.GetAccessoryInfoByKey(accKey);
+
+            List<CharaDetailDefine> AccessoryHairColorDetailBuilder()
+            {
+                List<CharaDetailDefine> colorInfo = new List<CharaDetailDefine>();
+
+                void updateAccHairColor(ChaControl chaCtrl, int colorIndex, Color newColor)
+                {
+                    accInfo.partsInfo.colorInfo[colorIndex].color = newColor;
+                    if (accInfo.IsVanillaSlot)
+                        accInfo.orgPartsInfo.colorInfo[colorIndex].color = newColor;
+                    //chaCtrl.ChangeAccessoryColor(accInfo.slotNo);
+                    chaCtrl.ChangeHairTypeAccessoryColor(accInfo.slotNo);
+                }
+
+                // color title seperator
+                colorInfo.Add(new CharaDetailDefine
+                {
+                    Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Acc Hair Color Setting",
+                    Type = CharaDetailDefine.CharaDetailDefineType.SEPERATOR,
+                });
+
+                // BaseColor
+                colorInfo.Add(new CharaDetailDefine
+                {
+                    Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#BaseColor",
+                    Type = CharaDetailDefine.CharaDetailDefineType.COLOR,
+                    Get = (chaCtrl) => { return accInfo.partsInfo.colorInfo[0].color; },
+                    Set = (chaCtrl, v) => { updateAccHairColor(chaCtrl, 0, (Color)v); },
+                });
+
+                // TopColor
+                colorInfo.Add(new CharaDetailDefine
+                {
+                    Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#TopColor",
+                    Type = CharaDetailDefine.CharaDetailDefineType.COLOR,
+                    Get = (chaCtrl) => { return accInfo.partsInfo.colorInfo[1].color; },
+                    Set = (chaCtrl, v) => { updateAccHairColor(chaCtrl, 1, (Color)v); },
+                });
+
+                // UnderColor
+                colorInfo.Add(new CharaDetailDefine
+                {
+                    Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#UnderColor",
+                    Type = CharaDetailDefine.CharaDetailDefineType.COLOR,
+                    Get = (chaCtrl) => { return accInfo.partsInfo.colorInfo[2].color; },
+                    Set = (chaCtrl, v) => { updateAccHairColor(chaCtrl, 2, (Color)v); },
+                });
+
+                // Specular
+                colorInfo.Add(new CharaDetailDefine
+                {
+                    Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Specular",
+                    Type = CharaDetailDefine.CharaDetailDefineType.COLOR,
+                    Get = (chaCtrl) => { return accInfo.partsInfo.colorInfo[3].color; },
+                    Set = (chaCtrl, v) => { updateAccHairColor(chaCtrl, 3, (Color)v); },
+                });
+
+                // Metallic
+                colorInfo.Add(new CharaDetailDefine
+                {
+                    Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Metallic",
+                    Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                    Get = (chaCtrl) => { return accInfo.partsInfo.colorInfo[0].metallicPower; },
+                    Set = (chaCtrl, v) => 
+                    {
+                        accInfo.partsInfo.colorInfo[0].metallicPower = (float)v;
+                        if (accInfo.IsVanillaSlot)
+                            accInfo.orgPartsInfo.colorInfo[0].metallicPower = (float)v;
+                        chaCtrl.ChangeHairTypeAccessoryColor(accInfo.slotNo);
+                    },
+                });
+
+                // Smoothness
+                colorInfo.Add(new CharaDetailDefine
+                {
+                    Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Smoothness",
+                    Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                    Get = (chaCtrl) => { return accInfo.partsInfo.colorInfo[0].smoothnessPower; },
+                    Set = (chaCtrl, v) =>
+                    {
+                        accInfo.partsInfo.colorInfo[0].smoothnessPower = (float)v;
+                        if (accInfo.IsVanillaSlot)
+                            accInfo.orgPartsInfo.colorInfo[0].smoothnessPower = (float)v;
+                        chaCtrl.ChangeHairTypeAccessoryColor(accInfo.slotNo);
+                    },
+                });
+
+                // restore color
+                colorInfo.Add(new CharaDetailDefine
+                {
+                    Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Get back hair color",
+                    Type = CharaDetailDefine.CharaDetailDefineType.BUTTON,
+                    Upd = (chaCtrl) => { cec.AlignAccessoryColorWithHair(accKey, 0); },
+                });
+                colorInfo.Add(new CharaDetailDefine
+                {
+                    Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Get front hair color",
+                    Type = CharaDetailDefine.CharaDetailDefineType.BUTTON,
+                    Upd = (chaCtrl) => { cec.AlignAccessoryColorWithHair(accKey, 1); },
+                });
+                colorInfo.Add(new CharaDetailDefine
+                {
+                    Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Get side hair color",
+                    Type = CharaDetailDefine.CharaDetailDefineType.BUTTON,
+                    Upd = (chaCtrl) => { cec.AlignAccessoryColorWithHair(accKey, 2); },
+                });
+                colorInfo.Add(new CharaDetailDefine
+                {
+                    Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Get extension hair color",
+                    Type = CharaDetailDefine.CharaDetailDefineType.BUTTON,
+                    Upd = (chaCtrl) => { cec.AlignAccessoryColorWithHair(accKey, 3); },
+                });
+
+                return colorInfo;
+            }
+
+            List<CharaDetailDefine> AccessoryColorDetailBuilder(int i)
+            {
+                List<CharaDetailDefine> colorInfo = new List<CharaDetailDefine>();
+
+                string colorNo = (i + 1).ToString();
+
+                // color title seperator
+                colorInfo.Add(new CharaDetailDefine
+                {
+                    Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Acc Color " + colorNo + " Setting",
+                    Type = CharaDetailDefine.CharaDetailDefineType.SEPERATOR,
+                });
+
+                // Color
+                colorInfo.Add(new CharaDetailDefine
+                {
+                    Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Color " + colorNo,
+                    Type = CharaDetailDefine.CharaDetailDefineType.COLOR,
+                    Get = (chaCtrl) => { return accInfo.partsInfo.colorInfo[i].color; },
+                    Set = (chaCtrl, v) => 
+                    {
+                        accInfo.partsInfo.colorInfo[i].color = (Color)v;
+                        if (accInfo.IsVanillaSlot)
+                            accInfo.orgPartsInfo.colorInfo[i].color = (Color)v;
+                        chaCtrl.ChangeAccessoryColor(accInfo.slotNo);
+                    },
+                });
+
+                // Gloss
+                colorInfo.Add(new CharaDetailDefine
+                {
+                    Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Gloss " + colorNo,
+                    Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                    Get = (chaCtrl) => { return accInfo.partsInfo.colorInfo[i].glossPower; },
+                    Set = (chaCtrl, v) =>
+                    {
+                        accInfo.partsInfo.colorInfo[i].glossPower = (float)v;
+                        if (accInfo.IsVanillaSlot)
+                            accInfo.orgPartsInfo.colorInfo[i].glossPower = (float)v;
+                        chaCtrl.ChangeAccessoryColor(accInfo.slotNo);
+                    },
+                });
+
+                // Metallic
+                colorInfo.Add(new CharaDetailDefine
+                {
+                    Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Metallic " + colorNo,
+                    Type = CharaDetailDefine.CharaDetailDefineType.SLIDER,
+                    Get = (chaCtrl) => { return accInfo.partsInfo.colorInfo[i].metallicPower; },
+                    Set = (chaCtrl, v) =>
+                    {
+                        accInfo.partsInfo.colorInfo[i].metallicPower = (float)v;
+                        if (accInfo.IsVanillaSlot)
+                            accInfo.orgPartsInfo.colorInfo[i].metallicPower = (float)v;
+                        chaCtrl.ChangeAccessoryColor(accInfo.slotNo);
+                    },
+                });
+
+                // restore color
+                colorInfo.Add(new CharaDetailDefine
+                {
+                    Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Restore default color " + colorNo,
+                    Type = CharaDetailDefine.CharaDetailDefineType.BUTTON,
+                    Upd = (chaCtrl) => { cec.RestoreAccessoryDefaultColor(accKey, i); },
+                });
+
+                return colorInfo;
+            }
+
+            List<CharaDetailDefine> AccessoryMoveDetailBuilder(int moveIndex)
+            {
+                const float posDim1 = 0.005f;
+                const float posDim2 = 0.05f;
+                const float rotDim1 = 0.05f;
+                const float rotDim2 = 0.5f;
+                const float sclDim1 = 0.001f;
+                const float sclDim2 = 0.01f;
+                List<CharaDetailDefine> moveDetail = new List<CharaDetailDefine>();
+
+                void updateMoveVector3(ChaControl chaCtrl, int trfIndex, string seg, float v)
+                {
+                    Vector3 oldV = accInfo.partsInfo.addMove[moveIndex, trfIndex];
+                    Vector3 newV;
+                    if (seg == "x")
+                        newV = new Vector3(v, oldV.y, oldV.z);
+                    else if (seg == "y")
+                        newV = new Vector3(oldV.x, v, oldV.z);
+                    else if (seg == "z")
+                        newV = new Vector3(oldV.x, oldV.y, v);
+                    else
+                        throw new InvalidOperationException("Invalid segment: " + seg);
+
+                    accInfo.partsInfo.addMove[moveIndex, trfIndex] = newV;
+                    if (accInfo.IsVanillaSlot)
+                        accInfo.orgPartsInfo.addMove[moveIndex, trfIndex] = newV;
+                    chaCtrl.UpdateAccessoryMoveFromInfo(accInfo.slotNo);
+                }
+
+                string moveNo = (moveIndex + 1).ToString();
+
+                // adjust title seperator
+                moveDetail.Add(new CharaDetailDefine
+                {
+                    Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Acc Adjust " + moveNo + " Setting",
+                    Type = CharaDetailDefine.CharaDetailDefineType.SEPERATOR,
+                });
+
+                // position x
+                moveDetail.Add(new CharaValueDetailDefine
+                {
+                    Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Position " + moveNo + " X",
+                    Get = (chaCtrl) => { return accInfo.partsInfo.addMove[moveIndex, 0].x; },
+                    Set = (chaCtrl, v) => { updateMoveVector3(chaCtrl, 0, "x", (float)v); },
+                    DefValue = 0,
+                    DimStep1 = posDim1,
+                    DimStep2 = posDim2,
+                });
+
+                // position y
+                moveDetail.Add(new CharaValueDetailDefine
+                {
+                    Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Position " + moveNo + " Y",
+                    Get = (chaCtrl) => { return accInfo.partsInfo.addMove[moveIndex, 0].y; },
+                    Set = (chaCtrl, v) => { updateMoveVector3(chaCtrl, 0, "y", (float)v); },
+                    DefValue = 0,
+                    DimStep1 = posDim1,
+                    DimStep2 = posDim2,
+                });
+
+                // position z
+                moveDetail.Add(new CharaValueDetailDefine
+                {
+                    Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Position " + moveNo + " Z",
+                    Get = (chaCtrl) => { return accInfo.partsInfo.addMove[moveIndex, 0].z; },
+                    Set = (chaCtrl, v) => { updateMoveVector3(chaCtrl, 0, "z", (float)v); },
+                    DefValue = 0,
+                    DimStep1 = posDim1,
+                    DimStep2 = posDim2,
+                });
+
+                // rotation x
+                moveDetail.Add(new CharaValueDetailDefine
+                {
+                    Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Rotation " + moveNo + " X",
+                    Get = (chaCtrl) => { return accInfo.partsInfo.addMove[moveIndex, 1].x; },
+                    Set = (chaCtrl, v) => { updateMoveVector3(chaCtrl, 1, "x", (float)v); },
+                    MinValue = 0,
+                    MaxValue = 360,
+                    DefValue = 0,
+                    LoopValue = true,
+                    DimStep1 = rotDim1,
+                    DimStep2 = rotDim2,
+                });
+
+                // rotation y
+                moveDetail.Add(new CharaValueDetailDefine
+                {
+                    Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Rotation " + moveNo + " Y",
+                    Get = (chaCtrl) => { return accInfo.partsInfo.addMove[moveIndex, 1].y; },
+                    Set = (chaCtrl, v) => { updateMoveVector3(chaCtrl, 1, "y", (float)v); },
+                    MinValue = 0,
+                    MaxValue = 360,
+                    DefValue = 0,
+                    LoopValue = true,
+                    DimStep1 = rotDim1,
+                    DimStep2 = rotDim2,
+                });
+
+                // rotation z
+                moveDetail.Add(new CharaValueDetailDefine
+                {
+                    Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Rotation " + moveNo + " Z",
+                    Get = (chaCtrl) => { return accInfo.partsInfo.addMove[moveIndex, 1].z; },
+                    Set = (chaCtrl, v) => { updateMoveVector3(chaCtrl, 1, "z", (float)v); },
+                    MinValue = 0,
+                    MaxValue = 360,
+                    DefValue = 0,
+                    LoopValue = true,
+                    DimStep1 = rotDim1,
+                    DimStep2 = rotDim2,
+                });
+
+                // scale x
+                moveDetail.Add(new CharaValueDetailDefine
+                {
+                    Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Scale " + moveNo + " X",
+                    Get = (chaCtrl) => { return accInfo.partsInfo.addMove[moveIndex, 2].x; },
+                    Set = (chaCtrl, v) => { updateMoveVector3(chaCtrl, 2, "x", (float)v); },
+                    MinValue = sclDim1,
+                    DefValue = 1,
+                    DimStep1 = sclDim1,
+                    DimStep2 = sclDim2,
+                });
+
+                // scale y
+                moveDetail.Add(new CharaValueDetailDefine
+                {
+                    Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Scale " + moveNo + " Y",
+                    Get = (chaCtrl) => { return accInfo.partsInfo.addMove[moveIndex, 2].y; },
+                    Set = (chaCtrl, v) => { updateMoveVector3(chaCtrl, 2, "y", (float)v); },
+                    MinValue = sclDim1,
+                    DefValue = 1,
+                    DimStep1 = sclDim1,
+                    DimStep2 = sclDim2,
+                });
+
+                // scale z
+                moveDetail.Add(new CharaValueDetailDefine
+                {
+                    Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Scale " + moveNo + " Z",
+                    Get = (chaCtrl) => { return accInfo.partsInfo.addMove[moveIndex, 2].z; },
+                    Set = (chaCtrl, v) => { updateMoveVector3(chaCtrl, 2, "z", (float)v); },
+                    MinValue = sclDim1,
+                    DefValue = 1,
+                    DimStep1 = sclDim1,
+                    DimStep2 = sclDim2,
+                });
+
+                return moveDetail;
+            }
+
+            // Category
+            accDetails.Add(new CharaDetailDefine
+            {
+                Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Acc Category",
+                Type = CharaDetailDefine.CharaDetailDefineType.SELECTOR,
+                Get = (chaCtrl) => { return accInfo.category; },
+                Set = (chaCtrl, v) =>
+                {
+                    accInfo.partsInfo.type = (int)v;
+                    accInfo.partsInfo.parentKey = "";
+                    //if (accInfo.IsVanillaSlot)
+                    //{
+                    //    accInfo.orgPartsInfo.type = accInfo.partsInfo.type;
+                    //}
+                    /*
+                    for (int i = 0; i < 2; i++)
+                    {
+                        base.orgAcs.parts[base.SNo].addMove[i, 0] = (accInfo.partsInfo.addMove[i, 0] = Vector3.zero);
+                        base.orgAcs.parts[base.SNo].addMove[i, 1] = (accInfo.partsInfo.addMove[i, 1] = Vector3.zero);
+                        base.orgAcs.parts[base.SNo].addMove[i, 2] = (accInfo.partsInfo.addMove[i, 2] = Vector3.one);
+                    }
+                    */
+                    chaCtrl.ChangeAccessory(accInfo.slotNo, accInfo.partsInfo.type, ChaAccessoryDefine.AccessoryDefaultIndex[(int)v - 350], "", true);
+                    /*
+                    this.SetDefaultColor();
+                    base.chaCtrl.ChangeAccessoryColor(base.SNo);
+                    */
+                    //accInfo.partsInfo.noShake = false;
+                    if (accInfo.IsVanillaSlot)
+                    {
+                        accInfo.orgPartsInfo.type = accInfo.partsInfo.type;
+                        accInfo.orgPartsInfo.id = accInfo.partsInfo.id;
+                        accInfo.orgPartsInfo.parentKey = accInfo.partsInfo.parentKey;
+                        accInfo.orgPartsInfo.noShake = accInfo.partsInfo.noShake;
+
+                    }
+
+                    // update info
+                    accInfo.UpdateAccessoryInfo(chaCtrl);
+                    cec.UpdateDetailInfo_AccType(accKey);
+                },
+                SelectorList = (chaCtrl) => { return GetAccessoryCategorySelectList(); },
+            });
+
+            // if not empty
+            if (!accInfo.IsEmptySlot)
+            {
+                // acc id
+                accDetails.Add(new CharaDetailDefine
+                {
+                    Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Acc ID",
+                    Type = CharaDetailDefine.CharaDetailDefineType.SELECTOR,
+                    Get = (chaCtrl) => { return accInfo.partsInfo.id; },
+                    Set = (chaCtrl, v) =>
+                    {
+                        //bool oldAccIsHair = accInfo.accCmp != null ? oldAccIsHair = accInfo.accCmp.typeHair : false;
+                        string oldParentKey = accInfo.partsInfo.parentKey;
+
+                        // change acc id
+                        chaCtrl.ChangeAccessory(accInfo.slotNo, accInfo.partsInfo.type, (int)v, "", false);
+
+                        // restore setting
+                        if (!oldParentKey.Equals(accInfo.partsInfo.parentKey))
+                        {
+                            chaCtrl.ChangeAccessoryParent(accInfo.slotNo, oldParentKey);
+                        }
+                        //accInfo.partsInfo.noShake = false;  // reset no shake flag
+                        
+                        // org copy
+                        if (accInfo.IsVanillaSlot)
+                        {
+                            accInfo.orgPartsInfo.id = accInfo.partsInfo.id;
+                            accInfo.orgPartsInfo.parentKey = accInfo.partsInfo.parentKey;
+                            accInfo.orgPartsInfo.noShake = accInfo.partsInfo.noShake;
+                        }
+
+                        /*
+                        this.SetDefaultColor();
+                        base.chaCtrl.ChangeAccessoryColor(base.SNo);
+                        bool flag2 = false;
+                        if (base.chaCtrl.cmpAccessory != null && null != base.chaCtrl.cmpAccessory[base.SNo])
+                        {
+                            flag2 = base.chaCtrl.cmpAccessory[base.SNo].typeHair;
+                        }
+                        if (!oldAccIsHair && flag2)
+                        {
+                            this.ChangeHairTypeAccessoryColor(0);
+                        }
+                        */
+
+                        // update info
+                        accInfo.UpdateAccessoryInfo(chaCtrl);
+                        cec.UpdateDetailInfo_AccType(accKey);
+                    },
+                    SelectorList = (chaCtrl) => { return CvsBase.CreateSelectList((ChaListDefine.CategoryNo)accInfo.category); },
+                });
+
+                // parent
+                accDetails.Add(new CharaDetailDefine
+                {
+                    Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Acc Parent",
+                    Type = CharaDetailDefine.CharaDetailDefineType.SELECTOR,
+                    Get = (chaCtrl) => { return ChaAccessoryDefine.GetAccessoryParentInt(accInfo.partsInfo.parentKey); },
+                    Set = (chaCtrl, v) =>
+                    {
+                        string pKey = ((ChaAccessoryDefine.AccessoryParentKey)((int)v)).ToString();
+                        chaCtrl.ChangeAccessoryParent(accInfo.slotNo, pKey);
+                        if (accInfo.IsVanillaSlot)
+                            accInfo.orgPartsInfo.parentKey = accInfo.partsInfo.parentKey;
+                    },
+                    SelectorList = (chaCtrl) => { return GetAccessoryParentSelectList(); },
+                });
+
+                // visible
+                accDetails.Add(new CharaDetailDefine
+                {
+                    Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Visible",
+                    Type = CharaDetailDefine.CharaDetailDefineType.TOGGLE,
+                    Get = (chaCtrl) => { return PluginMoreAccessories.GetAccessoryVisible(chaCtrl, int.Parse(accKey)); },
+                    Set = (chaCtrl, v) => { PluginMoreAccessories.SetAccessoryVisible(chaCtrl, int.Parse(accKey), (bool)v); },
+                });
+
+                // restore color
+                accDetails.Add(new CharaDetailDefine
+                {
+                    Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Restore all default color",
+                    Type = CharaDetailDefine.CharaDetailDefineType.BUTTON,
+                    Upd = (chaCtrl) => { cec.RestoreAccessoryDefaultColor(accKey, -1); },
+                });
+
+                // color
+                if (accInfo.accCmp.typeHair)
+                {
+                    accDetails.AddRange(AccessoryHairColorDetailBuilder());
+                }
+                else
+                {
+                    if (accInfo.accCmp.useColor01)
+                        accDetails.AddRange(AccessoryColorDetailBuilder(0));
+                    if (accInfo.accCmp.useColor02)
+                        accDetails.AddRange(AccessoryColorDetailBuilder(1));
+                    if (accInfo.accCmp.useColor03)
+                        accDetails.AddRange(AccessoryColorDetailBuilder(2));
+                    if (accInfo.accCmp.rendAlpha != null && accInfo.accCmp.rendAlpha.Length > 0)
+                        accDetails.AddRange(AccessoryColorDetailBuilder(3));
+                }
+
+                // move
+                if (accInfo.accCmp.trfMove01 != null)
+                    accDetails.AddRange(AccessoryMoveDetailBuilder(0));
+                if (accInfo.accCmp.trfMove02 != null)
+                    accDetails.AddRange(AccessoryMoveDetailBuilder(1));
+
+                // no shake
+                accDetails.Add(new CharaDetailDefine
+                {
+                    Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Shake setting",
+                    Type = CharaDetailDefine.CharaDetailDefineType.SEPERATOR,
+                });
+                accDetails.Add(new CharaDetailDefine
+                {
+                    Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#No Shake",
+                    Type = CharaDetailDefine.CharaDetailDefineType.TOGGLE,
+                    Get = (chaCtrl) => { return accInfo.partsInfo.noShake; },
+                    Set = (chaCtrl, v) =>
+                    {
+                        accInfo.partsInfo.noShake = (bool)v;
+                        if (accInfo.IsVanillaSlot)
+                            accInfo.orgPartsInfo.noShake = (bool)v;
+                    },
+                });
+            }
+
+            // Done
+            return accDetails.ToArray();
+        }
+
+        public static string[] AccessoryUpdateSequenceKeyBuilder(ChaControl charInfo, string accKey)
+        {
+            List<string> keyList = new List<string>();
+            string keyBase = CharaEditorController.CT1_ACCS + "#" + accKey + "#";
+
+            string[] AccHairColorUpdateSequenceKeyBuilder()
+            {
+                return new string[]
+                {
+                    keyBase + "BaseColor",
+                    keyBase + "TopColor",
+                    keyBase + "UnderColor",
+                    keyBase + "Specular",
+                    keyBase + "Metallic",
+                    keyBase + "Smoothness",
+                };
+            }
+
+            string[] AccColorUpdateSequenceKeyBuilder(int colorIndex)
+            {
+                string colorNo = (colorIndex + 1).ToString();
+
+                return new string[]
+                {
+                    keyBase + "Color " + colorNo,
+                    keyBase + "Gloss " + colorNo,
+                    keyBase + "Metallic " + colorNo,
+                };
+            }
+
+            string[] AccAdjustUpdateSequenceKeyBuilder(int moveIndex)
+            {
+                string moveNo = (moveIndex + 1).ToString();
+                return new string[]
+                {
+                    keyBase + "Position " + moveNo + " X",
+                    keyBase + "Position " + moveNo + " Y",
+                    keyBase + "Position " + moveNo + " Z",
+                    keyBase + "Rotation " + moveNo + " X",
+                    keyBase + "Rotation " + moveNo + " Y",
+                    keyBase + "Rotation " + moveNo + " Z",
+                    keyBase + "Scale " + moveNo + " X",
+                    keyBase + "Scale " + moveNo + " Y",
+                    keyBase + "Scale " + moveNo + " Z",
+                };
+            }
+
+            keyList.Add(keyBase + "Acc Category");
+            keyList.Add(keyBase + "Acc ID");
+            keyList.Add(keyBase + "Acc Parent");
+            keyList.Add(keyBase + "Visible");
+            keyList.AddRange(AccHairColorUpdateSequenceKeyBuilder());
+            keyList.AddRange(AccColorUpdateSequenceKeyBuilder(0));
+            keyList.AddRange(AccColorUpdateSequenceKeyBuilder(1));
+            keyList.AddRange(AccColorUpdateSequenceKeyBuilder(2));
+            keyList.AddRange(AccColorUpdateSequenceKeyBuilder(3));
+            keyList.AddRange(AccAdjustUpdateSequenceKeyBuilder(0));
+            keyList.AddRange(AccAdjustUpdateSequenceKeyBuilder(1));
+            keyList.Add(keyBase + "No Shake");
+
+            return keyList.ToArray();
+        }
+
+        private static List<CustomSelectInfo> accessoryCategorySelectList;
+        public static List<CustomSelectInfo> GetAccessoryCategorySelectList()
+        {
+            if (accessoryCategorySelectList == null)
+            {
+                accessoryCategorySelectList = new List<CustomSelectInfo>();
+
+                ChaListDefine.CategoryNo[] cateNos = new ChaListDefine.CategoryNo[]
+                {
+                    ChaListDefine.CategoryNo.ao_none,
+                    ChaListDefine.CategoryNo.ao_head,
+                    ChaListDefine.CategoryNo.ao_ear,
+                    ChaListDefine.CategoryNo.ao_glasses,
+                    ChaListDefine.CategoryNo.ao_face,
+                    ChaListDefine.CategoryNo.ao_neck,
+                    ChaListDefine.CategoryNo.ao_shoulder,
+                    ChaListDefine.CategoryNo.ao_chest,
+                    ChaListDefine.CategoryNo.ao_waist,
+                    ChaListDefine.CategoryNo.ao_back,
+                    ChaListDefine.CategoryNo.ao_arm,
+                    ChaListDefine.CategoryNo.ao_hand,
+                    ChaListDefine.CategoryNo.ao_leg,
+                    ChaListDefine.CategoryNo.ao_kokan,
+                };
+
+                for (int i = 0; i < cateNos.Length; i ++)
+                {
+                    ChaListDefine.CategoryNo cNo = cateNos[i];
+                    CustomSelectInfo csi = new CustomSelectInfo();
+                    csi.id = (int)cNo;
+                    csi.name = cNo.ToString().Substring(3) + " " + ChaAccessoryDefine.dictAccessoryType[i];
+                    csi.assetBundle = null;
+                    csi.assetName = null;
+                    accessoryCategorySelectList.Add(csi);
+                }
+            }
+            return accessoryCategorySelectList;
+        }
+
+        private static List<CustomSelectInfo> accessoryParentSelectList;
+        public static List<CustomSelectInfo> GetAccessoryParentSelectList()
+        {
+            if (accessoryParentSelectList == null)
+            {
+                accessoryParentSelectList = new List<CustomSelectInfo>();
+                for (int i = 1; i < ChaAccessoryDefine.AccessoryParentName.Length; i++)
+                {
+                    CustomSelectInfo csi = new CustomSelectInfo();
+                    csi.id = i;
+                    csi.name = ((ChaAccessoryDefine.AccessoryParentKey)i).ToString().Substring(2) + " " + ChaAccessoryDefine.AccessoryParentName[i];
+                    csi.assetBundle = null;
+                    csi.assetName = null;
+                    accessoryParentSelectList.Add(csi);
+                }
+            }
+            return accessoryParentSelectList;
+        }
+
     }
 
     /*

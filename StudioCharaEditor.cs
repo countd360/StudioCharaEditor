@@ -18,7 +18,7 @@ namespace StudioCharaEditor
     {
         public const string GUID = "Countd360.StudioCharaEditor.HS2";
         public const string Name = "Studio Chara Editor";
-        public const string Version = "1.1.1";
+        public const string Version = "2.0.0";
         public const string DefaultPathMacro = "$DEFAULT_CHAR_PATH$";
 
         public static StudioCharaEditor Instance { get; private set; }
@@ -30,6 +30,8 @@ namespace StudioCharaEditor
         public static ConfigEntry<bool> DoubleThumbnailSize { get; private set; }
         public static ConfigEntry<bool> PreciseInputMode { get; private set; }
         public static ConfigEntry<bool> UnlimitedSlider { get; private set; }
+        public static ConfigEntry<bool> ShowSelectedThumb { get; private set; }
+        public static ConfigEntry<bool> CloseListAfterSelect { get; private set; }
 
         public static ConfigEntry<int> UIXPosition { get; private set; }
         public static ConfigEntry<int> UIYPosition { get; private set; }
@@ -51,6 +53,8 @@ namespace StudioCharaEditor
             DoubleThumbnailSize = Config.Bind("General", "Double export PNG size", false, "Use double sized thumbnail photo when export char to PNG");
             PreciseInputMode = Config.Bind("General", "Precise input mode", false, "Allows the user to enter decimal for fine adjustment");
             UnlimitedSlider = Config.Bind("General", "Unlimited slider bar", false, "Slider input without limit check. AT YOUR OWN RISK!");
+            ShowSelectedThumb = Config.Bind("General", "Thumbnail of current item", true, "Show the thumbnail of current selected item (hair, clothes, etc)");
+            CloseListAfterSelect = Config.Bind("General", "Folder list after select", true, "Auto folder up the list after click on a item");
 
             UIXPosition = Config.Bind("GUI", "Main GUI X position", 50, "X offset from left in pixel");
             UIYPosition = Config.Bind("GUI", "Main GUI Y position", 300, "Y offset from top in pixel");
@@ -69,6 +73,9 @@ namespace StudioCharaEditor
                                             true,
                                             "Whether or not to show the greeting text");
             */
+
+            // init accessories plugin
+            PluginMoreAccessories.Initialize();
 
             // start
             GameObject gameObject = new GameObject(Name);
