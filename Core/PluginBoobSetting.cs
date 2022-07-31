@@ -55,14 +55,14 @@ namespace StudioCharaEditor
                 Key = "Body#ShapeBreast#OverridePhysics",
                 Type = CharaDetailDefine.CharaDetailDefineType.TOGGLE,
                 Get = (chaCtrl) => { return GetBoolValue(chaCtrl, "overridePhysics"); },
-                Set = (chaCtrl, v) => { SetBoolValue(chaCtrl, "overridePhysics", (bool)v); chaCtrl.UpdateBustSoftness(); chaCtrl.ChangeBustInert(false); },
+                Set = (chaCtrl, v) => { SetBoolValue(chaCtrl, "overridePhysics", CharaDetailDefine.ParseBool(v)); chaCtrl.UpdateBustSoftness(); chaCtrl.ChangeBustInert(false); },
             },
             new CharaBoobSettingDetailDefine
             {
                 Key = "Body#ShapeBreast#OverrideGravity",
                 Type = CharaDetailDefine.CharaDetailDefineType.TOGGLE,
                 Get = (chaCtrl) => { return GetBoolValue(chaCtrl, "overrideGravity"); },
-                Set = (chaCtrl, v) => { SetBoolValue(chaCtrl, "overrideGravity", (bool)v); chaCtrl.UpdateBustGravity(); },
+                Set = (chaCtrl, v) => { SetBoolValue(chaCtrl, "overrideGravity", CharaDetailDefine.ParseBool(v)); chaCtrl.UpdateBustGravity(); },
             },
             new CharaBoobSettingDetailDefine
             {
@@ -125,8 +125,9 @@ namespace StudioCharaEditor
                 Type = CharaDetailDefine.CharaDetailDefineType.TOGGLE,
                 Get = (chaCtrl) => { return GetBoolValue(chaCtrl, BoobController.BUTT+"overridePhysics"); },
                 Set = (chaCtrl, v) => {
-                    SetBoolValue(chaCtrl, BoobController.BUTT+"overridePhysics", (bool)v);
-                    if ((bool)v)
+                    bool en = CharaDetailDefine.ParseBool(v);
+                    SetBoolValue(chaCtrl, BoobController.BUTT+"overridePhysics", en);
+                    if (en)
                     {
                         chaCtrl.UpdateBustSoftness();
                         chaCtrl.ChangeBustInert(false);
@@ -144,8 +145,9 @@ namespace StudioCharaEditor
                 Type = CharaDetailDefine.CharaDetailDefineType.TOGGLE,
                 Get = (chaCtrl) => { return GetBoolValue(chaCtrl, BoobController.BUTT+"overrideGravity"); },
                 Set = (chaCtrl, v) => {
-                    SetBoolValue(chaCtrl, BoobController.BUTT+"overrideGravity", (bool)v);
-                    if ((bool)v)
+                    bool en = CharaDetailDefine.ParseBool(v);
+                    SetBoolValue(chaCtrl, BoobController.BUTT+"overrideGravity", en);
+                    if (en)
                     {
                         chaCtrl.UpdateBustGravity();
                     }

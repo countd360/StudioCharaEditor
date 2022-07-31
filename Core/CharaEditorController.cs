@@ -355,11 +355,7 @@ namespace StudioCharaEditor
             
             void addToUpdateSequence(CharaDetailInfo cdi)
             {
-                if (cdi.DetailDefine.Type == CharaDetailDefine.CharaDetailDefineType.SEPERATOR)
-                {
-                    return;
-                }
-                if (cdi.RevertValue == null)
+                if (!cdi.DetailDefine.IsData)
                 {
                     return;
                 }
@@ -510,7 +506,7 @@ namespace StudioCharaEditor
                 List<string> clothOverlaySK = new List<string>();
                 foreach (string clothName in myCategorySet[CT1_CTHS])
                 {
-                    clothOverlaySK.Add(PluginOverlayDetailSet.ClothOverlayUpdateSequenceKey(clothName));
+                    clothOverlaySK.AddRange(PluginOverlayDetailSet.ClothOverlayUpdateSequenceKey(clothName));
                 }
                 addToUpdateSequenceList(clothOverlaySK.ToArray());
             }

@@ -105,6 +105,32 @@ namespace StudioCharaEditor
                        Type == CharaDetailDefineType.CLOTH_OVERLAY;
             }
         }
+
+        public static bool ParseBool(object v)
+        {
+            if (v is bool)
+            {
+                return (bool)v;
+            }
+            else if (v is int)
+            {
+                return ((int)v) != 0;
+            }
+            else
+            {
+                bool retb;
+                int reti;
+                float retf;
+                if (bool.TryParse(v.ToString(), out retb))
+                    return retb;
+                else if (int.TryParse(v.ToString(), out reti))
+                    return reti != 0;
+                else if (float.TryParse(v.ToString(), out retf))
+                    return retf != 0;
+                else
+                    return false;
+            }
+        }
     }
 
     class CharaValueDetailDefine : CharaDetailDefine
@@ -2815,8 +2841,9 @@ namespace StudioCharaEditor
                         Get = (chaCtrl) => { return !chaCtrl.nowCoordinate.clothes.parts[index].hideOpt[0]; },
                         Set = (chaCtrl, v) =>
                         {
-                            chaCtrl.nowCoordinate.clothes.parts[index].hideOpt[0] = !(bool)v;
-                            chaCtrl.chaFile.coordinate.clothes.parts[index].hideOpt[0] = !(bool)v;
+                            bool en = CharaDetailDefine.ParseBool(v);
+                            chaCtrl.nowCoordinate.clothes.parts[index].hideOpt[0] = !en;
+                            chaCtrl.chaFile.coordinate.clothes.parts[index].hideOpt[0] = !en;
                         },
                     };
                     clothDetails.Add(option1);
@@ -2832,8 +2859,9 @@ namespace StudioCharaEditor
                         Get = (chaCtrl) => { return !chaCtrl.nowCoordinate.clothes.parts[index].hideOpt[1]; },
                         Set = (chaCtrl, v) =>
                         {
-                            chaCtrl.nowCoordinate.clothes.parts[index].hideOpt[1] = !(bool)v;
-                            chaCtrl.chaFile.coordinate.clothes.parts[index].hideOpt[1] = !(bool)v;
+                            bool en = CharaDetailDefine.ParseBool(v);
+                            chaCtrl.nowCoordinate.clothes.parts[index].hideOpt[1] = !en;
+                            chaCtrl.chaFile.coordinate.clothes.parts[index].hideOpt[1] = !en;
                         },
                     };
                     clothDetails.Add(option2);
@@ -3347,7 +3375,7 @@ namespace StudioCharaEditor
                     Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Visible",
                     Type = CharaDetailDefine.CharaDetailDefineType.TOGGLE,
                     Get = (chaCtrl) => { return PluginMoreAccessories.GetAccessoryVisible(chaCtrl, int.Parse(accKey)); },
-                    Set = (chaCtrl, v) => { PluginMoreAccessories.SetAccessoryVisible(chaCtrl, int.Parse(accKey), (bool)v); },
+                    Set = (chaCtrl, v) => { PluginMoreAccessories.SetAccessoryVisible(chaCtrl, int.Parse(accKey), CharaDetailDefine.ParseBool(v)); },
                 });
 
                 // restore color
@@ -3394,9 +3422,9 @@ namespace StudioCharaEditor
                     Get = (chaCtrl) => { return accInfo.partsInfo.noShake; },
                     Set = (chaCtrl, v) =>
                     {
-                        accInfo.partsInfo.noShake = (bool)v;
+                        accInfo.partsInfo.noShake = CharaDetailDefine.ParseBool(v);
                         if (accInfo.IsVanillaSlot)
-                            accInfo.orgPartsInfo.noShake = (bool)v;
+                            accInfo.orgPartsInfo.noShake = accInfo.partsInfo.noShake;
                     },
                 });
             }
@@ -3633,7 +3661,7 @@ namespace StudioCharaEditor
                 Key = "NoShake",
                 Type = CharaDetailDefine.CharaDetailDefineType.TOGGLE,
                 Get = (chaCtrl) => { return chaCtrl.fileHair.parts[PartsNo].dictBundle[BundleKey].noShake ? (float)1 : (float)0; },
-                Set = (chaCtrl, v) => { chaCtrl.fileHair.parts[PartsNo].dictBundle[BundleKey].noShake = v.GetType() == typeof(bool) ? (bool)v : (float)v == 1; },
+                Set = (chaCtrl, v) => { chaCtrl.fileHair.parts[PartsNo].dictBundle[BundleKey].noShake = CharaDetailDefine.ParseBool(v); },
                 GetRevertValue = (bundleSet) => { return bundleSet[0]; },
             },
             new CharaHairBundleDetailDefine
@@ -3721,7 +3749,7 @@ namespace StudioCharaEditor
                 Key = "Body#ShapeBreast#PushUpEnable",
                 Type = CharaDetailDefine.CharaDetailDefineType.TOGGLE,
                 Get = (chaCtrl) => { return CheckPushupEnable(chaCtrl); },
-                Set = (chaCtrl, v) => { SetPushupEnable(chaCtrl, (bool)v); },
+                Set = (chaCtrl, v) => { SetPushupEnable(chaCtrl, CharaDetailDefine.ParseBool(v)); },
             },
         };
     }

@@ -944,15 +944,7 @@ namespace StudioCharaEditor
         private void guiRenderToggle(ChaControl chaCtrl, string name, CharaDetailInfo dInfo)
         {
             bool newV, oldV;
-            object curV = dInfo.DetailDefine.Get(chaCtrl);
-            if (curV.GetType() == typeof(bool))
-            {
-                oldV = (bool)curV;
-            }
-            else
-            {
-                oldV = (float)curV == 1;
-            }
+            oldV = CharaDetailDefine.ParseBool(dInfo.DetailDefine.Get(chaCtrl));
 
             GUILayout.BeginHorizontal();
             GUILayout.Label(" ", GUILayout.Width(namew));
@@ -960,14 +952,7 @@ namespace StudioCharaEditor
             GUILayout.FlexibleSpace();
             if (dInfo.RevertValue != null && GUILayout.Button("R", GUILayout.Width(25)))
             {
-                if (dInfo.RevertValue.GetType() == typeof(bool))
-                {
-                    newV = (bool)dInfo.RevertValue;
-                }
-                else
-                {
-                    newV = (float)dInfo.RevertValue == 1;
-                }
+                newV = CharaDetailDefine.ParseBool(dInfo.RevertValue);
             }
             if (newV != oldV)
             {
@@ -1371,8 +1356,11 @@ namespace StudioCharaEditor
 
         private void guiRenderSkinOverlay(ChaControl chaCtrl, string name, CharaDetailInfo dInfo)
         {
-            GUIStyle texTextStyle = new GUIStyle("box");
-            texTextStyle.alignment = TextAnchor.MiddleCenter;
+            float OverlayThumbSize = 124;
+            GUIStyle texTextStyle = new GUIStyle("box")
+            {
+                alignment = TextAnchor.MiddleCenter
+            };
 
             // current part texture
             SkinOverlayDetailDefine overlayDefine = (SkinOverlayDetailDefine)dInfo.DetailDefine;
@@ -1382,9 +1370,9 @@ namespace StudioCharaEditor
             GUILayout.BeginHorizontal();
             GUILayout.Label(LC(name), GUILayout.Width(namew));
             if (tex != null)
-                GUILayout.Box(tex, GUILayout.Width(thumbSize), GUILayout.Height(thumbSize));
+                GUILayout.Box(tex, GUILayout.Width(OverlayThumbSize), GUILayout.Height(OverlayThumbSize));
             else
-                GUILayout.Box(LC("No Texture"), texTextStyle, GUILayout.Width(thumbSize), GUILayout.Height(thumbSize));
+                GUILayout.Box(LC("No Texture"), texTextStyle, GUILayout.Width(OverlayThumbSize), GUILayout.Height(OverlayThumbSize));
             GUILayout.BeginVertical();
             if (GUILayout.Button(LC("Load new texture")))
                 overlayDefine.LoadNewOverlayTexture(chaCtrl);
@@ -1400,8 +1388,11 @@ namespace StudioCharaEditor
 
         private void guiRenderClothOverlay(ChaControl chaCtrl, string name, CharaDetailInfo dInfo)
         {
-            GUIStyle texTextStyle = new GUIStyle("box");
-            texTextStyle.alignment = TextAnchor.MiddleCenter;
+            float OverlayThumbSize = 124;
+            GUIStyle texTextStyle = new GUIStyle("box")
+            {
+                alignment = TextAnchor.MiddleCenter
+            };
 
             // current part texture
             ClothOverlayDetailDefine overlayDefine = (ClothOverlayDetailDefine)dInfo.DetailDefine;
@@ -1411,11 +1402,11 @@ namespace StudioCharaEditor
             GUILayout.BeginHorizontal();
             GUILayout.Label(LC(name), GUILayout.Width(namew));
             if (texData != null && texData.Texture != null)
-                GUILayout.Box(texData.Texture, GUILayout.Width(thumbSize), GUILayout.Height(thumbSize));
+                GUILayout.Box(texData.Texture, GUILayout.Width(OverlayThumbSize), GUILayout.Height(OverlayThumbSize));
             else
-                GUILayout.Box(LC("No Texture"), texTextStyle, GUILayout.Width(thumbSize), GUILayout.Height(thumbSize));
+                GUILayout.Box(LC("No Texture"), texTextStyle, GUILayout.Width(OverlayThumbSize), GUILayout.Height(OverlayThumbSize));
             GUILayout.BeginVertical();
-            if (GUILayout.Button(LC("Load new overlay texture")))
+            if (GUILayout.Button(LC("Load overlay texture")))
                 overlayDefine.LoadNewOverlayTexture(chaCtrl);
             if (texData != null && GUILayout.Button(LC("Clear overlay texture")))
                 overlayDefine.SetClothOverlayTex(chaCtrl, null);
@@ -1423,14 +1414,6 @@ namespace StudioCharaEditor
                 overlayDefine.DumpClothOverlayTexture(chaCtrl);
             if (GUILayout.Button(LC("Dump original texture")))
                 overlayDefine.DumpClothOrignalTexture(chaCtrl);
-            if (texData != null)
-            {
-                bool newOverride = GUILayout.Toggle(texData.Override, LC("Hide base textrue"));
-                if (newOverride != texData.Override) {
-                    texData.Override = newOverride;
-                    overlayDefine.RefreshClothesTexture(chaCtrl);
-                }
-            }
             if (overlayDefine.modified && GUILayout.Button(LC("Revert")))
             {
                 overlayDefine.SetClothOverlayTex(chaCtrl, dInfo.RevertValue);

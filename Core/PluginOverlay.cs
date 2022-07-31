@@ -297,13 +297,42 @@ namespace StudioCharaEditor
                 Key = CharaEditorController.CT1_CTHS + "#" + category2 + "#Overlay Setting",
                 Type = CharaDetailDefine.CharaDetailDefineType.SEPERATOR,
             };
+
             ClothOverlayDetailDefine ovl = new ClothOverlayDetailDefine(category2, index);
-            return new CharaDetailDefine[] { sep, ovl };
+
+            CharaDetailDefine hbt = new CharaDetailDefine
+            {
+                Key = CharaEditorController.CT1_CTHS + "#" + category2 + "#Overlay hide base textrue",
+                Type = CharaDetailDefine.CharaDetailDefineType.TOGGLE,
+                Get = (chaCtrl) => 
+                {
+                    ClothesTexData texData = (ClothesTexData)ovl.GetClothOverlayTexData(chaCtrl);
+                    if (texData != null)
+                        return texData.Override;
+                    else
+                        return false;
+                },
+                Set = (chaCtrl, v) =>
+                {
+                    bool en = CharaDetailDefine.ParseBool(v);
+                    ClothesTexData texData = (ClothesTexData)ovl.GetClothOverlayTexData(chaCtrl);
+                    if (texData != null && texData.Override != en)
+                    {
+                        texData.Override = en;
+                        ovl.RefreshClothesTexture(chaCtrl);
+                    }
+                },
+            };
+
+            return new CharaDetailDefine[] { sep, ovl, hbt };
         }
 
-        static public string ClothOverlayUpdateSequenceKey(string category2)
+        static public string[] ClothOverlayUpdateSequenceKey(string category2)
         {
-            return CharaEditorController.CT1_CTHS + "#" + category2 + "#Overlay";
+            return new string[] {
+                 CharaEditorController.CT1_CTHS + "#" + category2 + "#Overlay",
+                 CharaEditorController.CT1_CTHS + "#" + category2 + "#Overlay hide base textrue",
+            };
         }
     }
 }
