@@ -2,9 +2,6 @@
 using AIChara;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using UnityEngine;
 using PushUpAI;
 using HS2_BoobSettings;
@@ -12,6 +9,8 @@ using KKABMX.Core;
 using KoiSkinOverlayX;
 using KoiClothesOverlayX;
 using MessagePack;
+using CharaCustom;
+using static Illusion.Utils;
 
 namespace StudioCharaEditor
 {
@@ -178,6 +177,7 @@ namespace StudioCharaEditor
         public bool hairSameColor;
         public bool hairAutoColor;
         public bool textureInited;
+        public bool accSortByParent;
 
         // extend plugins
         public object PushUpController { get; private set; }
@@ -306,6 +306,7 @@ namespace StudioCharaEditor
 
         public void InitTexture(bool init)
         {
+            // TODO: MeterialEditor issue
             ChaControl chaCtrl = ociTarget.charInfo;
             if (init && !textureInited)
             {
@@ -515,17 +516,45 @@ namespace StudioCharaEditor
             InitTexture(true);
         }
 
+        /// <summary>
+        /// build myAccessoriesInfo data, which is always slot number sorted,
+        /// and return a string list of valid acc keys, which affected by sort mode
+        /// </summary>
+        /// <returns>list of valid acc keys</returns>
         public List<string> BuildAccessoriesList()
         {
             ChaControl chaCtrl = ociTarget.charInfo;
             myAccessoriesInfo = new List<AccessoryInfo>();
             List<string> accKeys = new List<string>();
             int accCount = PluginMoreAccessories.GetAccessoryCount(chaCtrl);
+            // build myAccessoriesInfo
             for (int slotNo = 0; slotNo < accCount; slotNo ++)
             {
                 var ai = new AccessoryInfo(chaCtrl, slotNo);
                 myAccessoriesInfo.Add(ai);
-                accKeys.Add(ai.AccKey);
+                if (!accSortByParent) accKeys.Add(ai.AccKey);
+            }
+            // sort by parent
+            if (accSortByParent)
+            {
+                List<CustomSelectInfo> parentSelectList = CharaDetailSet.GetAccessoryParentSelectList();
+                foreach (CustomSelectInfo parentInfo in parentSelectList)
+                {
+                    bool hadChild = false;
+                    for (int slotNo = 0; slotNo < accCount; slotNo++)
+                    {
+                        AccessoryInfo ai = myAccessoriesInfo[slotNo];
+                        if (!ai.IsEmptySlot && ChaAccessoryDefine.GetAccessoryParentInt(ai.partsInfo.parentKey) == parentInfo.id)
+                        {
+                            if (!hadChild)
+                            {
+                                accKeys.Add("==" + parentInfo.name + "==");
+                                hadChild = true;
+                            }
+                            accKeys.Add(ai.AccKey);
+                        }
+                    }
+                }
             }
  
             return accKeys;
@@ -549,8 +578,9 @@ namespace StudioCharaEditor
             // rebuild list
             myCategorySet[CT1_ACCS] = BuildAccessoriesList();
             // rebuild details
-            foreach (string accKey in myCategorySet[CT1_ACCS])
+            foreach (var accInfo in myAccessoriesInfo)
             {
+                string accKey = accInfo.AccKey;
                 // clear old set if exist, or create a new one
                 string setName = CT1_ACCS + "#" + accKey;
                 Dictionary<string, object> oldRevValue = new Dictionary<string, object>();
@@ -589,6 +619,109 @@ namespace StudioCharaEditor
             }
         }
 
+        public AccessoryDetailInfo GetAccessoryDetailData(string accKey)
+        {
+            try
+            {
+                AccessoryDetailInfo accDetail = new AccessoryDetailInfo();
+                // Accessory info
+                accDetail.accInfo = GetAccessoryInfoByKey(accKey);
+                if (accDetail.accInfo == null)
+                {
+                    throw new Exception("Fail to get accessory info");
+                }
+                // Accessory info list
+                accDetail.accDetails = GetDetailInfoList(CT1_ACCS, accKey);
+                // Accessory data
+                accDetail.accData = GetDataDictByCategory(CT1_ACCS, accKey);
+                return accDetail;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("GetAccessoryDetail failed: accKey = '" + accKey + "': " + ex.Message);
+                return null;
+            }
+        }
+
+        public bool SetAccessoryDetailData(string tgtSlot, AccessoryDetailInfo accDetail, bool mirrorParent, bool mirrorAdjust)
+        {
+            //Console.WriteLine($"Copy {accDetail.accInfo.AccName} to {tgtSlot}. mirror parent = {mirrorParent}, mirror adjust = {mirrorAdjust}");
+            const string PARENT_DATA_NAME = "Acc Parent";
+            const string PREFIX_POSITION = "Position ";
+            const string PREFIX_ROTATION = "Rotation ";
+            //string PREFIX_SCALE = "Scale ";
+            const string SURFIX_X = " X";
+            const string SURFIX_Y = " Y";
+            const string SURFIX_Z = " Z";
+
+            try
+            {
+                // build a data dict to new slot
+                Dictionary<string, object> newSlotData = new Dictionary<string, object>();
+                foreach (var pair in accDetail.accData)
+                {
+                    // change key
+                    string dataName = pair.Key.Split(KEY_SEP_CHAR)[2];
+                    string newKey = CT1_ACCS + KEY_SEP_CHAR[0] + tgtSlot + KEY_SEP_CHAR[0] + dataName;
+                    object newVal = pair.Value;
+
+                    // mirror parent
+                    if (mirrorParent && dataName.Equals(PARENT_DATA_NAME))
+                    {
+                        newVal = CharaDetailSet.GetAccessoryMirrorParentId((int)newVal);
+                    }
+
+                    // mirror adjustment
+                    if (mirrorAdjust && dataName.StartsWith(PREFIX_POSITION) && dataName.EndsWith(SURFIX_X))
+                    {
+                        newVal = -(float)newVal;
+                    }
+                    if (mirrorAdjust && dataName.StartsWith(PREFIX_ROTATION) && (dataName.EndsWith(SURFIX_Y) || dataName.EndsWith(SURFIX_Z)))
+                    {
+                        newVal = -(float)newVal;
+                    }
+
+                    // add to new slot data
+                    newSlotData.Add(newKey, newVal);
+                }
+
+                SetDataDict(newSlotData);
+                //Console.WriteLine(" - Done!");
+                return true;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($" - Failed: {e.Message}");
+                return false;
+            }
+        }
+
+        public void ClearClothSlot(string clothName)
+        {
+            string key = CT1_CTHS + KEY_SEP_CHAR[0] + clothName + KEY_SEP_CHAR[0] + clothName + " Type";
+            if (myDetailDict.ContainsKey(key))
+            {
+                myDetailDict[key].DetailDefine.Set(ociTarget.charInfo, 0);
+            }
+            else
+            {
+                Console.WriteLine("ClearClothSlot failed for known cloth name: " + clothName);
+            }
+        }
+
+        public void ClearAccessorySlot(string accKey)
+        {
+            string key = CT1_ACCS + KEY_SEP_CHAR[0] + accKey + KEY_SEP_CHAR[0] + "Acc Category";
+            if (myDetailDict.ContainsKey(key))
+            {
+                myDetailDict[key].DetailDefine.Set(ociTarget.charInfo, 350);
+            }
+            else
+            {
+                Console.WriteLine("ClearAccessorySlot failed for known accKey: " + accKey);
+            }
+        }
+
         public string[] GetCategoryList(string category1)
         {
             if (myCategorySet.ContainsKey(category1))
@@ -599,7 +732,7 @@ namespace StudioCharaEditor
             return new string[] { };
         }
 
-        public CharaDetailInfo[] GetDetaiInfoList(string category1, string category2)
+        public CharaDetailInfo[] GetDetailInfoList(string category1, string category2)
         {
             if (myCategorySet.ContainsKey(category1))
             {
@@ -614,6 +747,19 @@ namespace StudioCharaEditor
                 }
             }
             return new CharaDetailInfo[] { };
+        }
+
+        public CharaDetailInfo GetDetailInfo(string category1, string category2, string category3)
+        {
+            string key = category1 + KEY_SEP_CHAR[0] + category2 + KEY_SEP_CHAR[0] + category3;
+            if (myDetailDict.ContainsKey(key))
+            {
+                return myDetailDict[key];
+            }
+            else
+            {
+                return null;
+            }
         }
 
         public void UpdateDetailInfo_ClothType(string category2)
@@ -717,12 +863,16 @@ namespace StudioCharaEditor
             return category2;
         }
 
-        public AccessoryInfo GetAccessoryInfoByKey(string category2)
+        public AccessoryInfo GetAccessoryInfoByKey(string accKey)
         {
             try
             {
-                int slotNo = int.Parse(category2);
-                if (!myAccessoriesInfo[slotNo].AccKey.Equals(category2))
+                int slotNo = int.Parse(accKey);
+                if (slotNo >= myAccessoriesInfo.Count)
+                {
+                    return null;
+                }
+                if (!myAccessoriesInfo[slotNo].AccKey.Equals(accKey))
                 {
                     throw new InvalidOperationException("Accessory key not match!?");
                 }
@@ -730,7 +880,7 @@ namespace StudioCharaEditor
             }
             catch (Exception ex)
             {
-                Console.WriteLine("GetAccessoryInfoByKey failed: accKey = '" + category2 + "': " + ex.Message);
+                Console.WriteLine("GetAccessoryInfoByKey failed: accKey = '" + accKey + "': " + ex.Message);
                 return null;
             }
         }
@@ -1088,46 +1238,83 @@ namespace StudioCharaEditor
                 return;
             }
 
+            // clear remain
+            bool verbose = StudioCharaEditor.VerboseMessage.Value;
+            int filteredDataCount = 0;
+            int settedDataCount = 0;
+            int failedDataCount = 0;
+            if (verbose)
+            {
+                Console.WriteLine($"CharaEditorController.SetDataDict start: inputed {data.Count} data");
+                foreach (string key in data.Keys)
+                {
+                    if (!myUpdateSequence.Contains(key))
+                    {
+                        Console.WriteLine($"- Key '{key}' filtered for not existed in update sequence");
+                        filteredDataCount++;
+                    }
+                }
+            }
+
+            // update by sequence
             foreach (string key in myUpdateSequence)
             {
                 if (!data.ContainsKey(key))
                 {
                     continue;   // not in data, skip
                 }
-                if (myDetailDict.ContainsKey(key))
+                if (!myDetailDict.ContainsKey(key))
                 {
-                    try
+                    if (verbose)
                     {
-                        if (force)
+                        Console.WriteLine($"- Key '{key}' filtered for detail not defined");
+                        filteredDataCount++;
+                    }
+                    continue;   // unknown detail
+                }
+                // do set data
+                try
+                {
+                    if (force)
+                    {
+                        //Console.WriteLine("SetData " + key);
+                        myDetailDict[key].DetailDefine.Set(ociTarget.charInfo, data[key]);
+                    }
+                    else
+                    {
+                        object cValue = myDetailDict[key].DetailDefine.Get(ociTarget.charInfo);
+                        if (!DataValueEqual(cValue, data[key]))
                         {
                             //Console.WriteLine("SetData " + key);
                             myDetailDict[key].DetailDefine.Set(ociTarget.charInfo, data[key]);
                         }
-                        else
-                        {
-                            object cValue = myDetailDict[key].DetailDefine.Get(ociTarget.charInfo);
-                            if (!DataValueEqual(cValue, data[key]))
-                            {
-                                //Console.WriteLine("SetData " + key);
-                                myDetailDict[key].DetailDefine.Set(ociTarget.charInfo, data[key]);
-                            }
-                        }
                     }
-                    catch (Exception ex)
+                    if (verbose)
                     {
-                        Console.WriteLine("Set value failed for key <" + key + ">, value <" + data[key].ToString() + ">: " + ex.Message);
+                        Console.WriteLine($"- Key '{key}' updated");
+                        settedDataCount++;
                     }
                 }
-                else
+                catch (Exception ex)
                 {
-                    Console.WriteLine("Detail not defined for value-key: " + key);
+                    Console.WriteLine($"- Key '{key}' fail to update: {ex.Message}");
+                    failedDataCount++;
                 }
             }
+
+            // reload
             Reload();
+
+            // report
+            if (verbose)
+            {
+                Console.WriteLine($"CharaEditorController.SetDataDict end: set {settedDataCount}, filtered {filteredDataCount}, failed {failedDataCount}\n");
+            }
         }
 
         public void RevertAll()
         {
+            bool verbose = StudioCharaEditor.VerboseMessage.Value;
             foreach (string key in myUpdateSequence)
             {
                 if (!myDetailDict.ContainsKey(key) || !myDetailDict[key].DetailDefine.IsData)
@@ -1140,7 +1327,7 @@ namespace StudioCharaEditor
                     object cValue = myDetailDict[key].DetailDefine.Get(ociTarget.charInfo);
                     if (!DataValueEqual(cValue, myDetailDict[key].RevertValue))
                     {
-                        //Console.WriteLine("Revert " + key);
+                        if (verbose) Console.WriteLine("Revert " + key);
                         myDetailDict[key].DetailDefine.Set(ociTarget.charInfo, myDetailDict[key].RevertValue);
                     }
                 }

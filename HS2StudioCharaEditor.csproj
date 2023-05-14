@@ -95,6 +95,8 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Core\AccessoryDetailInfo.cs" />
+    <Compile Include="Core\AccessoryInfo.cs" />
     <Compile Include="Core\CharaDetailInfo.cs" />
     <Compile Include="Core\CharaEditorController.cs" />
     <Compile Include="Core\CharaEditorMgr.cs" />

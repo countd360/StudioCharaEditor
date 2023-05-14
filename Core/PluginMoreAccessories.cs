@@ -6,54 +6,6 @@ using UnityEngine;
 
 namespace StudioCharaEditor
 {
-	public class AccessoryInfo
-    {
-		public int slotNo;
-		public int category;
-		public string AccKey;
-		public string AccName;
-		public ListInfoBase accInfo;
-		public CmpAccessory accCmp;
-		public ChaFileAccessory.PartsInfo partsInfo;
-		public ChaFileAccessory.PartsInfo orgPartsInfo;
-
-		public bool IsEmptySlot
-        {
-			get
-            {
-				return accInfo == null;
-			}
-        }
-
-		public bool IsVanillaSlot
-        {
-			get
-            {
-				return slotNo < PluginMoreAccessories.VANILLA_ACC_NUM;
-			}
-        }
-
-		public AccessoryInfo(ChaControl chaCtrl, int index)
-        {
-			slotNo = index;
-			AccKey = slotNo.ToString();
-
-			UpdateAccessoryInfo(chaCtrl);
-		}
-
-		public void UpdateAccessoryInfo(ChaControl chaCtrl)
-        {
-			// basic info
-			accInfo = PluginMoreAccessories.GetAccessoryInfo(chaCtrl, slotNo);
-			accCmp = PluginMoreAccessories.GetAccessoryCmp(chaCtrl, slotNo);
-			partsInfo = PluginMoreAccessories.GetPartsInfo(chaCtrl, slotNo);
-			category = IsEmptySlot ? (int)ChaListDefine.CategoryNo.ao_none : accInfo.Category;
-			orgPartsInfo = IsVanillaSlot ? chaCtrl.chaFile.coordinate.accessory.parts[slotNo] : null;
-
-			// name of acc
-			AccName = string.Format("{0:D2}: ", (slotNo+1)) + (IsEmptySlot ? "---" : accInfo.Name);
-		}
-	}
 
     public static class PluginMoreAccessories
     {
@@ -456,30 +408,16 @@ namespace StudioCharaEditor
 				return;
             }
 
-			// check and init CustomBase
-			if (Singleton<CustomBase>.Instance == null)
+			// set CustomBase
+			if (!CharaEditorMgr.SetCustomBase(chaCtrl))
             {
-				try
-                {
-					CustomBase dummyCustomBase = CharaEditorMgr.Instance.gameObject.AddComponent<CustomBase>();
-				}
-				catch (Exception ex)
-                {
-					Console.WriteLine("This is an expected exception for creating a CustomBase in studio: " + ex.Message);
-                }
-
-				// re-check
-				if (Singleton<CustomBase>.Instance == null)
-                {
-					StudioCharaEditor.Logger.LogError("Fail to add accessory slot.");
-					return;
-                }
+				StudioCharaEditor.Logger.LogError("Fail to add 1 accessory slot.");
+				return;
 			}
 
 			// add
 			try
             {
-				Singleton<CustomBase>.Instance.chaCtrl = chaCtrl;
 				_addOneSlot();
 			}
 			catch (Exception ex)
@@ -497,30 +435,16 @@ namespace StudioCharaEditor
 				return;
 			}
 
-			// check and init CustomBase
-			if (Singleton<CustomBase>.Instance == null)
-			{
-				try
-				{
-					CustomBase dummyCustomBase = CharaEditorMgr.Instance.gameObject.AddComponent<CustomBase>();
-				}
-				catch (NullReferenceException ex)
-				{
-					Console.WriteLine("This is an expected exception for creating a CustomBase in studio: " + ex.Message);
-				}
+            // set CustomBase
+            if (!CharaEditorMgr.SetCustomBase(chaCtrl))
+            {
+                StudioCharaEditor.Logger.LogError("Fail to add 10 accessory slots.");
+                return;
+            }
 
-				// re-check
-				if (Singleton<CustomBase>.Instance == null)
-				{
-					StudioCharaEditor.Logger.LogError("Fail to add accessory slot.");
-					return;
-				}
-			}
-
-			// add
-			try
+            // add
+            try
 			{
-				Singleton<CustomBase>.Instance.chaCtrl = chaCtrl;
 				_addTenSlots();
 			}
 			catch (Exception ex)

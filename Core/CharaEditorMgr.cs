@@ -9,6 +9,8 @@ using System.IO;
 using System.Reflection;
 using System.Xml;
 using UnityEngine;
+using CharaCustom;
+using HarmonyLib;
 
 namespace StudioCharaEditor
 {
@@ -232,7 +234,7 @@ namespace StudioCharaEditor
             return null;
         }
 
-        public string GetDllPath()
+        static public string GetDllPath()
         {
             //string dllPath = Path.GetDirectoryName(new Uri(this.GetType().Assembly.CodeBase).AbsolutePath);
             string codeBase = Assembly.GetExecutingAssembly().CodeBase;
@@ -242,7 +244,7 @@ namespace StudioCharaEditor
             return dllPath;
         }
 
-        public string GetExportPath(byte sex)
+        static public string GetExportCharaPath(byte sex)
         {
             string exportPath = StudioCharaEditor.CharaExportPath.Value;
             string defPath = Path.Combine(Paths.GameRootPath, sex == 0 ? "UserData\\chara\\male" : "UserData\\chara\\female");
@@ -251,6 +253,75 @@ namespace StudioCharaEditor
                 exportPath = exportPath.Replace(StudioCharaEditor.DefaultPathMacro, defPath);
             }
             return exportPath;
+        }
+
+        static public string GetExportCoordPath(byte sex)
+        {
+            string exportPath = StudioCharaEditor.CoordExportPath.Value;
+            string defPath = Path.Combine(Paths.GameRootPath, sex == 0 ? "UserData\\coordinate\\male" : "UserData\\coordinate\\female");
+            if (exportPath.Contains(StudioCharaEditor.DefaultCoordMacro))
+            {
+                exportPath = exportPath.Replace(StudioCharaEditor.DefaultCoordMacro, defPath);
+            }
+            return exportPath;
+        }
+
+        static public bool SetCustomBase(ChaControl chaCtrl)
+        {
+            // check and init CustomBase
+            if (Singleton<CustomBase>.Instance == null)
+            {
+                try
+                {
+                    CustomBase dummyCustomBase = CharaEditorMgr.Instance.gameObject.AddComponent<CustomBase>();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("This is an expected exception for creating a CustomBase in studio: " + ex.Message);
+                }
+
+                // re-check
+                if (Singleton<CustomBase>.Instance == null)
+                {
+                    StudioCharaEditor.Logger.LogError("Fail to create CustomBase.");
+                    return false;
+                }
+            }
+
+            try
+            {
+                Singleton<CustomBase>.Instance.chaCtrl = chaCtrl;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                StudioCharaEditor.Logger.LogError("Fail to set CustomBase.chaCtrl: " + ex.Message);
+                return false;
+            }
+        }
+
+        static public bool SetMakerApiInsideMaker(bool insideMaker)
+        {
+            try
+            {
+                //KKAPI.Maker.MakerAPI.InsideMaker = insideMaker;
+                Traverse makerApiCls = Traverse.CreateWithType("KKAPI.Maker.MakerAPI, HS2API");
+                Traverse insideMakerField = makerApiCls.Field("_insideMaker");
+                if (!insideMakerField.FieldExists())
+                {
+                    Console.WriteLine("_insideMaker not found in KKAPI.Maker.MakerAPI");
+                    return false;
+                }
+                insideMakerField.SetValue(insideMaker);
+                Console.WriteLine("Set KKAPI.Maker.MakerAPI._insideMaker = {0}", insideMaker);
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("This is an expected exception for set MakerAPI.InsiderMaker in studio: " + ex.Message);
+                return false;
+            }
         }
     }
 }

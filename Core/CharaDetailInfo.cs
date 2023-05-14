@@ -12,7 +12,7 @@ using UnityEngine;
 
 namespace StudioCharaEditor
 {
-    class CharaDetailInfo
+    public class CharaDetailInfo
     {
         public CharaDetailDefine DetailDefine;
         public object RevertValue;
@@ -24,7 +24,7 @@ namespace StudioCharaEditor
         }
     }
 
-    class CharaDetailDefine
+    public class CharaDetailDefine
     {
         public enum CharaDetailDefineType
         {
@@ -3223,7 +3223,7 @@ namespace StudioCharaEditor
                     Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Scale " + moveNo + " X",
                     Get = (chaCtrl) => { return accInfo.partsInfo.addMove[moveIndex, 2].x; },
                     Set = (chaCtrl, v) => { updateMoveVector3(chaCtrl, 2, "x", (float)v); },
-                    MinValue = sclDim1,
+                    //MinValue = sclDim1,
                     DefValue = 1,
                     DimStep1 = sclDim1,
                     DimStep2 = sclDim2,
@@ -3235,7 +3235,7 @@ namespace StudioCharaEditor
                     Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Scale " + moveNo + " Y",
                     Get = (chaCtrl) => { return accInfo.partsInfo.addMove[moveIndex, 2].y; },
                     Set = (chaCtrl, v) => { updateMoveVector3(chaCtrl, 2, "y", (float)v); },
-                    MinValue = sclDim1,
+                    //MinValue = sclDim1,
                     DefValue = 1,
                     DimStep1 = sclDim1,
                     DimStep2 = sclDim2,
@@ -3247,7 +3247,7 @@ namespace StudioCharaEditor
                     Key = CharaEditorController.CT1_ACCS + "#" + accKey + "#Scale " + moveNo + " Z",
                     Get = (chaCtrl) => { return accInfo.partsInfo.addMove[moveIndex, 2].z; },
                     Set = (chaCtrl, v) => { updateMoveVector3(chaCtrl, 2, "z", (float)v); },
-                    MinValue = sclDim1,
+                    //MinValue = sclDim1,
                     DefValue = 1,
                     DimStep1 = sclDim1,
                     DimStep2 = sclDim2,
@@ -3552,6 +3552,29 @@ namespace StudioCharaEditor
                 }
             }
             return accessoryParentSelectList;
+        }
+
+        public static int GetAccessoryMirrorParentId(int orgParentId)
+        {
+            try
+            {
+                string pKey = ((ChaAccessoryDefine.AccessoryParentKey)(orgParentId)).ToString();
+                if (pKey.EndsWith("_L"))
+                {
+                    string newKey = pKey.Substring(0, pKey.Length - 2) + "_R";
+                    return ChaAccessoryDefine.GetAccessoryParentInt(newKey);
+                }
+                if (pKey.EndsWith("_R"))
+                {
+                    string newKey = pKey.Substring(0, pKey.Length - 2) + "_L";
+                    return ChaAccessoryDefine.GetAccessoryParentInt(newKey);
+                }
+            }
+            catch
+            {
+                ;
+            }
+            return orgParentId;
         }
 
     }

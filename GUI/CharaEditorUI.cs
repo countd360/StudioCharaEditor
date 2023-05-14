@@ -1,6 +1,7 @@
 ﻿using AIChara;
 using BepInEx.Logging;
 using CharaCustom;
+using EpicToonFX;
 using HarmonyLib;
 using KKAPI.Utilities;
 using Studio;
@@ -8,7 +9,10 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Runtime.ConstrainedExecution;
 using UnityEngine;
+using static AIChara.ChaListDefine;
 
 namespace StudioCharaEditor
 {
@@ -19,6 +23,7 @@ namespace StudioCharaEditor
             Normal,
             ForCopy,
             ForPaste,
+            PasteSlotPrompt,
         };
 
         private readonly int windowID = 10123;
@@ -29,6 +34,11 @@ namespace StudioCharaEditor
         private TreeNodeObject lastSelectedTreeNode;
         private OCIChar ociTarget;
         private Dictionary<string, object> clipboard;
+        private List<AccessoryDetailInfo> accSlotClipboard = new List<AccessoryDetailInfo>();
+        private List<string> accSlotMultiSelection = new List<string>();
+        private bool copySlotAutoArrange = true;
+        private bool copySlotMirrorParent = false;
+        private bool copySlotMirrorAdjust = false;
         private bool renameMode = false;
         private bool searchingMode = false;
         private string tempCharaName;
@@ -46,6 +56,8 @@ namespace StudioCharaEditor
         private string savingPath;
         private string savingFilename;
         private Texture2D savingTexture;
+        private bool savingCoordinate = false;
+        private string coordinateName = "MyCoordinate";
 
         // GUI
         private GUIStyle largeLabel;
@@ -86,7 +98,7 @@ namespace StudioCharaEditor
             detailPageSelect = SelectMode.Normal;
         }
 
-    private void Start()
+        private void Start()
         {
             largeLabel = new GUIStyle("label");
             largeLabel.fontSize = 16;
@@ -109,6 +121,7 @@ namespace StudioCharaEditor
                     if (mouseInWindow)
                     {
                         Studio.Studio.Instance.cameraCtrl.noCtrlCondition = (() => mouseInWindow && VisibleGUI);
+                        Input.ResetInputAxes();
                     }
                 }
                 catch (Exception ex)
@@ -192,7 +205,7 @@ namespace StudioCharaEditor
             catch (Exception ex)
             {
                 Console.WriteLine(ex);
-                ResetGui();                
+                ResetGui();
             }
             finally
             {
@@ -291,6 +304,7 @@ namespace StudioCharaEditor
                     {
                         // selectable button
                         string detailSetKey = category1 + "#" + title;
+                        // color and init
                         Color color = GUI.color;
                         if (catelogIndex2[catelogIndex1] == c2)
                         {
@@ -298,13 +312,19 @@ namespace StudioCharaEditor
                             category2 = title;
                             curDetailSetKey = detailSetKey;
                         }
+                        else if (accSlotMultiSelection.Contains(title))
+                        {
+                            GUI.color = Color.yellow;
+                        }
+                        // title and style by catelog
                         if (catelogIndex1 == 3)
                         {
                             title = cec.GetClothDispName(title);
-                            cat1btnstyle.alignment = TextAnchor.MiddleCenter;                            
+                            cat1btnstyle.alignment = TextAnchor.MiddleCenter;
                         }
                         else if (catelogIndex1 == 4)
                         {
+                            if (accSlotMultiSelection.Count == 0) accSlotMultiSelection.Add(title);
                             title = cec.GetAccessoryInfoByKey(title)?.AccName;
                             cat1btnstyle.alignment = TextAnchor.MiddleLeft;
                         }
@@ -316,6 +336,46 @@ namespace StudioCharaEditor
                         {
                             catelogIndex2[catelogIndex1] = c2;
                             detailPageSelect = SelectMode.Normal;
+                            // accessory multi selection
+                            if (catelogIndex1 == 4)
+                            {
+                                string accKey = category2List[c2];
+                                if (Event.current.shift)
+                                {
+                                    // add from last selection
+                                    int lastC2 = category2List.ToList().IndexOf(accSlotMultiSelection[accSlotMultiSelection.Count - 1]);
+                                    if (lastC2 != c2)
+                                    {
+                                        int sFrom = c2 < lastC2 ? c2 : lastC2;
+                                        int sTo = c2 < lastC2 ? lastC2 : c2;
+                                        for (int s = sFrom; s <= sTo; s++)
+                                        {
+                                            if (category2List[s].StartsWith("=="))
+                                            {
+                                                continue;
+                                            }
+                                            if (!accSlotMultiSelection.Contains(category2List[s]))
+                                            {
+                                                accSlotMultiSelection.Add(category2List[s]);
+                                            }
+                                        }
+                                    }
+                                }
+                                else if (Event.current.control)
+                                {
+                                    // add one slot
+                                    if (!accSlotMultiSelection.Contains(accKey))
+                                    {
+                                        accSlotMultiSelection.Add(accKey);
+                                    }
+                                }
+                                else
+                                {
+                                    // one slot
+                                    accSlotMultiSelection.Clear();
+                                    accSlotMultiSelection.Add(accKey);
+                                }
+                            }
                         }
                         GUI.color = color;
                     }
@@ -324,18 +384,52 @@ namespace StudioCharaEditor
 
                 // category operation button
                 GUILayout.BeginVertical(GUI.skin.box);
-                if (catelogIndex1 == 4 && PluginMoreAccessories.HasMoreAccessories)
+                if (catelogIndex1 == 4)
                 {
+                    // accessory sort mode
                     GUILayout.BeginHorizontal();
-                    if (GUILayout.Button(LC("+1 Slot")))
+                    bool accSortMode = GUILayout.Toggle(cec.accSortByParent, LC("Sort by parent"));
+                    if (accSortMode != cec.accSortByParent)
                     {
-                        PluginMoreAccessories.AddOneAccessorySlot(cec.ociTarget.charInfo);
+                        cec.accSortByParent = accSortMode;
                         cec.RefreshAccessoriesList();
                     }
-                    if (GUILayout.Button(LC("+10 Slots")))
+                    GUILayout.EndHorizontal();
+                    // More Accessories add slot command
+                    if (PluginMoreAccessories.HasMoreAccessories)
                     {
-                        PluginMoreAccessories.AddTenAccessorySlots(cec.ociTarget.charInfo);
-                        cec.RefreshAccessoriesList();
+                        GUILayout.BeginHorizontal();
+                        if (GUILayout.Button(LC("+1 Slot")))
+                        {
+                            PluginMoreAccessories.AddOneAccessorySlot(cec.ociTarget.charInfo);
+                            cec.RefreshAccessoriesList();
+                        }
+                        if (GUILayout.Button(LC("+10 Slots")))
+                        {
+                            PluginMoreAccessories.AddTenAccessorySlots(cec.ociTarget.charInfo);
+                            cec.RefreshAccessoriesList();
+                        }
+                        GUILayout.EndHorizontal();
+                    }
+                    // copy/paste accessories between slots
+                    GUILayout.BeginHorizontal();
+                    if (GUILayout.Button(LC("Copy Slot")))
+                    {
+                        accSlotMultiSelection.Sort(CompareSlotNo);
+                        //Console.WriteLine("AccSlotMultiSelection to copy: " + string.Join(",", accSlotMultiSelection));
+                        // copy to clipboard
+                        accSlotClipboard.Clear();
+                        foreach (string accKey in accSlotMultiSelection)
+                        {
+                            accSlotClipboard.Add(cec.GetAccessoryDetailData(accKey));
+                        }
+                    }
+                    if (GUILayout.Button(LC("Paste Slot")) && accSlotClipboard != null)
+                    {
+                        accSlotMultiSelection.Sort(CompareSlotNo);
+                        //Console.WriteLine("AccSlotMultiSelection to paste: " + string.Join(",", accSlotMultiSelection));
+                        // change to paste mode
+                        detailPageSelect = SelectMode.PasteSlotPrompt;
                     }
                     GUILayout.EndHorizontal();
                 }
@@ -346,7 +440,7 @@ namespace StudioCharaEditor
                     {
                         string c2name = category2List[c2];
                         if (c2name.StartsWith("==") || c2name.StartsWith("++")) continue;
-                        foreach (CharaDetailInfo cdi in cec.GetDetaiInfoList(category1, c2name))
+                        foreach (CharaDetailInfo cdi in cec.GetDetailInfoList(category1, c2name))
                         {
                             tgtKeys.Add(cdi.DetailDefine.Key);
                         }
@@ -393,14 +487,160 @@ namespace StudioCharaEditor
                     GUILayout.EndHorizontal();
 
                     // chara detials editor
-                    if (cec.myDetailSet.ContainsKey(curDetailSetKey))
+                    if (detailPageSelect == SelectMode.PasteSlotPrompt)
                     {
-                        CharaDetailInfo[] detailInfoSet = cec.GetDetaiInfoList(category1, category2);
+                        // local function
+                        string getNewEmptySlot(List<string> selectedSlotKeys, List<string> registedSlotKeys)
+                        {
+                            int sFrom = int.Parse(selectedSlotKeys[0]);
+                            for (; ; sFrom++)
+                            {
+                                string accKey = sFrom.ToString();
+                                // pass selected slot
+                                if (selectedSlotKeys.Contains(accKey))
+                                {
+                                    continue;
+                                }
+                                // pass registed slot
+                                if (registedSlotKeys.Contains(accKey))
+                                {
+                                    continue;
+                                }
+                                // pass non-empty slot
+                                AccessoryInfo accInfo = cec.GetAccessoryInfoByKey(accKey);
+                                if (accInfo != null && !accInfo.IsEmptySlot)
+                                {
+                                    continue;
+                                }
+                                // select this slot
+                                return accKey;
+                            }
+                        }
+
+                        // build target slot info
+                        List<string> tgtSlotKeys = new List<string>();
+                        for (int i = 0; i < accSlotClipboard.Count; i++)
+                        {
+                            if (i < accSlotMultiSelection.Count)
+                            {
+                                AccessoryInfo accInfo = cec.GetAccessoryInfoByKey(accSlotMultiSelection[i]);
+                                if (!accInfo.IsEmptySlot && copySlotAutoArrange)
+                                {
+                                    // non-empty slot, arrange a new one
+                                    tgtSlotKeys.Add(getNewEmptySlot(accSlotMultiSelection, tgtSlotKeys));
+                                }
+                                else
+                                {
+                                    // empty slot or overwrite allowed, copy to selected one
+                                    tgtSlotKeys.Add(accSlotMultiSelection[i]);
+                                }
+                            }
+                            else if (copySlotAutoArrange)
+                            {
+                                // not enough tgt slot selected, arrange a new one
+                                tgtSlotKeys.Add(getNewEmptySlot(accSlotMultiSelection, tgtSlotKeys));
+                            }
+                            else
+                            {
+                                // target slot less then source slot
+                                break;
+                            }
+                        }
+
+                        // paste slot prompt mode, show copy info
+                        rightScroll = GUILayout.BeginScrollView(rightScroll, GUI.skin.box);
+                        GUILayout.Label(LC("Copy/paste accessory between slot:"));
+                        int newSlotCount = 0;
+                        for (int i = 0; i < tgtSlotKeys.Count; i++)
+                        {
+                            AccessoryInfo accInfo = cec.GetAccessoryInfoByKey(tgtSlotKeys[i]);
+                            string tgtSlotName;
+                            if (accInfo == null)
+                            {
+                                int nsIndex = int.Parse(tgtSlotKeys[i]);
+                                if (PluginMoreAccessories.HasMoreAccessories)
+                                {
+                                    // new slot
+                                    tgtSlotName = cyanText("new slot " + (nsIndex + 1).ToString());
+                                    newSlotCount++;
+                                }
+                                else
+                                {
+                                    // no more slot
+                                    tgtSlotName = redText(LC("No more slot! MoreAccessories not found?!"));
+                                }
+                            }
+                            else
+                            {
+                                if (accInfo.IsEmptySlot)
+                                {
+                                    // copy to empty
+                                    tgtSlotName = greenText(accInfo.AccName);
+                                }
+                                else
+                                {
+                                    // copy overwrite
+                                    tgtSlotName = magentaText(accInfo.AccName);
+                                }
+                            }
+                            GUILayout.Label("  " + accSlotClipboard[i].accInfo.AccName + " -> " + tgtSlotName);
+                        }
+                        GUILayout.EndScrollView();
+
+                        // detail page copy/paste
+                        GUILayout.BeginVertical(GUI.skin.box);
+                        copySlotAutoArrange = GUILayout.Toggle(copySlotAutoArrange, LC("Auto arrange empty slot, create new if needed"));
+                        GUILayout.BeginHorizontal();
+                        copySlotMirrorParent = GUILayout.Toggle(copySlotMirrorParent, LC("Mirror accessory parent"));
+                        copySlotMirrorAdjust = GUILayout.Toggle(copySlotMirrorAdjust, LC("Mirror accessory adjustment"));
+                        GUILayout.EndHorizontal();
+                        GUILayout.BeginHorizontal();
+                        if (GUILayout.Button(LC("OK")))
+                        {
+                            // check and create new slots
+                            if (newSlotCount > 0)
+                            {
+                                int need10 = (newSlotCount - 1) / 10 + 1;
+                                for (int i = 0; i < need10; i ++)
+                                {
+                                    PluginMoreAccessories.AddTenAccessorySlots(cec.ociTarget.charInfo);
+                                }
+                                cec.RefreshAccessoriesList();
+                            }
+
+                            // copy slots
+                            for (int i = 0; i < tgtSlotKeys.Count; i++)
+                            {
+                                AccessoryInfo accInfo = cec.GetAccessoryInfoByKey(tgtSlotKeys[i]);
+                                if (accInfo != null)
+                                {
+                                    cec.SetAccessoryDetailData(tgtSlotKeys[i], accSlotClipboard[i], copySlotMirrorParent, copySlotMirrorAdjust);
+                                }
+                                else
+                                {
+                                    Console.WriteLine($"Skip copy slot {accSlotClipboard[i].accInfo.AccName} to slot #{tgtSlotKeys[i]}, target accessory info not existed.");
+                                }
+                            }
+
+                            detailPageSelect = SelectMode.Normal;
+                        }
+                        if (GUILayout.Button(LC("Cancel")))
+                        {
+                            detailPageSelect = SelectMode.Normal;
+                        }
+                        GUILayout.EndHorizontal();
+                        GUILayout.EndVertical();
+
+                    }
+                    else if (cec.myDetailSet.ContainsKey(curDetailSetKey))
+                    {
+                        CharaDetailInfo[] detailInfoSet = cec.GetDetailInfoList(category1, category2);
                         Dictionary<string, object> pageClipboard = new Dictionary<string, object>();
                         // detail page scroll view
                         rightScroll = GUILayout.BeginScrollView(rightScroll, GUI.skin.box);
                         foreach (CharaDetailInfo dInfo in detailInfoSet)
                         {
+                            // setting or selecting mode
                             string dkey = dInfo.DetailDefine.Key;
                             string dname = dkey.Split(CharaEditorController.KEY_SEP_CHAR)[2];
                             if (detailPageSelect == SelectMode.Normal)
@@ -511,6 +751,26 @@ namespace StudioCharaEditor
                                     selectBuffer[dkey] = true;
                                 }
                             }
+                            if (catelogIndex1 == 3 || catelogIndex1 == 4)
+                            {
+                                Color color = GUI.color;
+                                GUI.color = Color.red;
+                                if (GUILayout.Button("Clear", GUILayout.ExpandWidth(false)))
+                                {
+                                    if (catelogIndex1 == 3)
+                                    {
+                                        cec.ClearClothSlot(category2);
+                                    }
+                                    else
+                                    {
+                                        foreach (string accKey in accSlotMultiSelection)
+                                        {
+                                            cec.ClearAccessorySlot(accKey);
+                                        }
+                                    }
+                                }
+                                GUI.color = color;
+                            }
                         }
                         else if (detailPageSelect == SelectMode.ForCopy)
                         {
@@ -583,7 +843,7 @@ namespace StudioCharaEditor
                 {
                     savingChara = ociTarget;
                     ChaFile savingChaFile = savingChara.charInfo.chaFile;
-                    savingPath = CharaEditorMgr.Instance.GetExportPath(savingChaFile.parameter.sex);
+                    savingPath = CharaEditorMgr.GetExportCharaPath(savingChaFile.parameter.sex);
                     savingFilename = string.Format("CharaEditor_{0:yyyy-MM-dd-HH-mm-ss}_{1}_{2}.png", DateTime.Now, savingChaFile.parameter.sex == 0 ? "male" : "female", savingChaFile.parameter.fullname);
                     if (savingChaFile.pngData != null)
                     {
@@ -594,6 +854,8 @@ namespace StudioCharaEditor
                     {
                         savingTexture = null;
                     }
+                    savingCoordinate = false;
+                    coordinateName = string.Format("{0}_cood", savingChaFile.parameter.fullname);
                     guiMode = GuiModeType.SAVE;
                 }
                 GUILayout.EndHorizontal();
@@ -690,6 +952,7 @@ namespace StudioCharaEditor
             {
                 dInfo.DetailDefine.Set(chaCtrl, newV);
                 if (dInfo.DetailDefine.Upd != null && !LaterUpdate) dInfo.DetailDefine.Upd(chaCtrl);
+                accessoryMultiAdjust(chaCtrl, name, dInfo, newV);
             }
             GUILayout.EndHorizontal();
         }
@@ -717,6 +980,7 @@ namespace StudioCharaEditor
                 {
                     dInfo.DetailDefine.Set(chaCtrl, color);
                     if (dInfo.DetailDefine.Upd != null && !LaterUpdate) dInfo.DetailDefine.Upd(chaCtrl);
+                    accessoryMultiAdjust(chaCtrl, name, dInfo, color);
                 }
             }
 
@@ -958,6 +1222,7 @@ namespace StudioCharaEditor
             {
                 dInfo.DetailDefine.Set(chaCtrl, newV);
                 if (dInfo.DetailDefine.Upd != null && !LaterUpdate) dInfo.DetailDefine.Upd(chaCtrl);
+                accessoryMultiAdjust(chaCtrl, name, dInfo, newV);
             }
             GUILayout.EndHorizontal();
         }
@@ -1005,8 +1270,11 @@ namespace StudioCharaEditor
             if (GUILayout.RepeatButton(">>", GUILayout.Width(30)))
                 newV += dim2;
             // def button
-            if (!float.IsNaN(vDefine.DefValue) && GUILayout.Button(vDefine.DefValue.ToString()))
+            if (!float.IsNaN(vDefine.DefValue) && accSlotMultiSelection.Count <= 1 && GUILayout.Button(vDefine.DefValue.ToString()))
                 newV = vDefine.DefValue;
+            // inv button
+            if (accSlotMultiSelection.Count <= 1 && GUILayout.Button("INV", GUILayout.ExpandWidth(false)))
+                newV = -newV;
             // revert
             GUILayout.FlexibleSpace();
             if (dInfo.RevertValue != null && GUILayout.Button("R", GUILayout.Width(25)))
@@ -1031,6 +1299,7 @@ namespace StudioCharaEditor
                 }
                 dInfo.DetailDefine.Set(chaCtrl, newV);
                 if (dInfo.DetailDefine.Upd != null && !LaterUpdate) dInfo.DetailDefine.Upd(chaCtrl);
+                accessoryMultiAdjust(chaCtrl, name, dInfo, newV - oldV, true);
             }
         }
 
@@ -1078,7 +1347,10 @@ namespace StudioCharaEditor
             GUILayout.Label(" ", GUILayout.Width(namew));
             // a button
             if (GUILayout.Button(LC(name)) && dInfo.DetailDefine.Upd != null)
+            {
                 dInfo.DetailDefine.Upd(chaCtrl);
+                accessoryMultiAdjust(chaCtrl, name, dInfo, null);
+            }
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
         }
@@ -1461,13 +1733,22 @@ namespace StudioCharaEditor
             GUILayout.Label(LC("PNG file name:"), largeLabel);
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
-            GUILayout.Label(cyanText(savingFilename));
+            if (savingCoordinate)
+            {
+                coordinateName = GUILayout.TextField(coordinateName, GUILayout.Width(200));
+                GUILayout.Label(".png", GUILayout.Width(50));
+            }
+            else
+            {
+                GUILayout.Label(cyanText(savingFilename));
+            }
             GUILayout.EndHorizontal();
             GUILayout.Space(10);
             GUILayout.BeginHorizontal();
             if (GUILayout.Button(LC("Change export path/filename"), btnstyle))
             {
-                OpenFileDialog.Show((files) => {
+                OpenFileDialog.Show((files) =>
+                {
                     if (files != null && files.Length > 0)
                     {
                         string pathname = files[0];
@@ -1533,6 +1814,14 @@ namespace StudioCharaEditor
                 }
             }
             GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            bool newSavingCoord = GUILayout.Toggle(savingCoordinate, LC("Save as coordinate file"));
+            if (newSavingCoord != savingCoordinate)
+            {
+                savingCoordinate = newSavingCoord;
+                savingPath = savingCoordinate ? CharaEditorMgr.GetExportCoordPath(savingChaFile.parameter.sex) : CharaEditorMgr.GetExportCharaPath(savingChaFile.parameter.sex);
+            }
+            GUILayout.EndHorizontal();
             GUILayout.EndVertical();
             GUILayout.EndHorizontal();
 
@@ -1542,16 +1831,48 @@ namespace StudioCharaEditor
             GUILayout.BeginHorizontal();
             if (GUILayout.Button(LC("Export PNG"), btnstyle, GUILayout.Width(cbwidth)))
             {
-                if (savingTexture != null)
-                {
-                    savingChaFile.pngData = savingTexture.EncodeToPNG();
-                }
-                string filename = Path.Combine(savingPath, savingFilename);
                 try
                 {
-                    Traverse.Create(savingChaFile).Method("SaveFile", new object[] { filename, 0 }).GetValue();
-                    StudioCharaEditor.Logger.Log(LogLevel.Message | LogLevel.Warning, string.Format("Charactor {0} saved to {1}.", savingChaFile.parameter.fullname, savingFilename));
-                    guiMode = GuiModeType.MAIN;
+                    if (savingCoordinate)
+                    {
+                        if (savingTexture != null)
+                        {
+                            savingChaFile.coordinate.pngData = savingTexture.EncodeToPNG();
+                        }
+                        savingChaFile.coordinate.coordinateName = coordinateName;
+
+                        string validCoordName = coordinateName;
+                        char[] invalidch = Path.GetInvalidFileNameChars();
+                        foreach (char c in invalidch)
+                        {
+                            validCoordName = validCoordName.Replace(c, '_');
+                        }
+                        if (!Path.GetExtension(validCoordName).ToLower().Equals(".png"))
+                        {
+                            validCoordName += ".png";
+                        }
+                        string filename = Path.Combine(savingPath, validCoordName);
+
+                        // trick KKAPI
+                        //CharaEditorMgr.SetMakerApiInsideMaker(true);
+                        //CharaEditorMgr.SetCustomBase(savingChara.charInfo);
+
+                        savingChaFile.coordinate.SaveFile(filename, (int)Manager.GameSystem.Instance.language);
+                        StudioCharaEditor.Logger.Log(LogLevel.Message | LogLevel.Warning, string.Format("Charactor {0}'s coordinate saved to {1}.", savingChaFile.parameter.fullname, validCoordName));
+                        guiMode = GuiModeType.MAIN;
+                    }
+                    else
+                    {
+                        if (savingTexture != null)
+                        {
+                            savingChaFile.pngData = savingTexture.EncodeToPNG();
+                        }
+                        string filename = Path.Combine(savingPath, savingFilename);
+
+                        Traverse.Create(savingChaFile).Method("SaveFile", new object[] { filename, 0 }).GetValue();
+                        StudioCharaEditor.Logger.Log(LogLevel.Message | LogLevel.Warning, string.Format("Charactor {0} saved to {1}.", savingChaFile.parameter.fullname, savingFilename));
+                        guiMode = GuiModeType.MAIN;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -1587,6 +1908,56 @@ namespace StudioCharaEditor
                 VisibleGUI = false;
             }
             GUI.color = oldColor;
+        }
+
+        private void accessoryMultiAdjust(ChaControl chaCtrl, string name, CharaDetailInfo dMasterInfo, object value, bool delta = false)
+        {
+            if (catelogIndex1 != 4) return; // only for accessories
+            if (accSlotMultiSelection.Count <= 1) return;   // only for multi selection
+
+            string masterAccKey = dMasterInfo.DetailDefine.Key.Split(CharaEditorController.KEY_SEP_CHAR)[1];
+            //Console.WriteLine($"Adjust for multi accessories: from={masterAccKey}, to={accSlotMultiSelection.Count - 1}, name={name}, value={value}, delta={delta}");
+            CharaEditorController cec = CharaEditorMgr.Instance.GetEditorController(ociTarget);
+            foreach (string accKey in accSlotMultiSelection)
+            {
+                if (accKey.Equals(masterAccKey))
+                {
+                    continue;   // skip master
+                }
+                CharaDetailInfo dInfo = cec.GetDetailInfo(CharaEditorController.CT1_ACCS, accKey, name);
+                if (dInfo == null)
+                {
+                    //Console.WriteLine($"Name <{name}> not found for acc slot {accKey}");
+                    continue;   // no detail info
+                }
+
+                // process value
+                if (value != null && !delta)
+                {
+                    // set and upd
+                    dInfo.DetailDefine.Set(chaCtrl, value);
+                    if (dInfo.DetailDefine.Upd != null && !LaterUpdate) dInfo.DetailDefine.Upd(chaCtrl);
+
+                }
+                else if (value != null && delta)
+                {
+                    // delta set
+                    float oldV = (float)dInfo.DetailDefine.Get(chaCtrl);
+                    float newV = (float)value + oldV;
+                    dInfo.DetailDefine.Set(chaCtrl, newV);
+                    if (dInfo.DetailDefine.Upd != null && !LaterUpdate) dInfo.DetailDefine.Upd(chaCtrl);
+                }
+                else if (value == null && dInfo.DetailDefine.Upd != null)
+                {
+                    // upd only
+                    dInfo.DetailDefine.Upd(chaCtrl);
+                }
+                else
+                {
+                    // skip
+                    Console.WriteLine("Unknown/Unsupported call input for multi accessory adjustment: " + accKey + "#" + name);
+                }
+            }
         }
 
         private void OnSelectChange(TreeNodeObject newSel)
@@ -1660,6 +2031,31 @@ namespace StudioCharaEditor
                 return curLocalizationDict[org];
             else
                 return org;
+        }
+
+        private static int CompareSlotNo(string x, string y)
+        {
+            try
+            {
+                int sx = int.Parse(x);
+                int sy = int.Parse(y);
+                if (sx < sy)
+                {
+                    return -1;
+                }
+                else if (sy < sx)
+                {
+                    return 1;
+                }
+                else
+                {
+                    return 0;
+                }
+            }
+            catch
+            {
+                return 0;
+            }
         }
     }
 }

@@ -490,7 +490,7 @@ namespace StudioCharaEditor
             new CharaABMXDetailDefine2
             {
                 Key = "Body#ShapeArm#ABMX Forearm Lower",
-                BoneName = "cf_J_ArmUp02_s",
+                BoneName = "cf_J_ArmLow02_s",
                 SubSlidersNames = new string[] { "Scale X", "Scale Z", },
                 SubSliderTargets = CharaABMXDetailDefine1.SLIDERRARGETS_SXZ,
             },
