@@ -1,4 +1,4 @@
-﻿using AIChara;
+using AIChara;
 using BepInEx.Logging;
 using CharaCustom;
 using EpicToonFX;
